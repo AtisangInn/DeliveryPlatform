@@ -10,37 +10,55 @@ public static class DbInitializer
     {
         await context.Database.MigrateAsync();
 
-        if (await context.Users.AnyAsync()) return; // Already seeded
-
-        // 1. Seed Users
-        var customer = new User
+        // 1. Seed Users (Idempotent check)
+        if (!await context.Users.AnyAsync(u => u.Email == "customer@example.com"))
         {
-            FullName = "Customer User",
-            Email = "customer@example.com",
-            PasswordHash = BC.HashPassword("password123"),
-            Role = "Customer",
-            Phone = "0112223333",
-            CreatedAt = DateTime.UtcNow
-        };
+            var customer = new User
+            {
+                FullName = "Customer User",
+                Email = "customer@example.com",
+                PasswordHash = BC.HashPassword("password123"),
+                Role = "Customer",
+                Phone = "0112223333",
+                CreatedAt = DateTime.UtcNow
+            };
+            context.Users.Add(customer);
+        }
 
-        var driver = new User
+        if (!await context.Users.AnyAsync(u => u.Email == "driver@example.com"))
         {
-            FullName = "Driver User",
-            Email = "driver@example.com",
-            PasswordHash = BC.HashPassword("password123"),
-            Role = "Driver",
-            Phone = "0114445555",
-            CreatedAt = DateTime.UtcNow
-        };
+            var driver = new User
+            {
+                FullName = "Driver User",
+                Email = "driver@example.com",
+                PasswordHash = BC.HashPassword("password123"),
+                Role = "Driver",
+                Phone = "0114445555",
+                CreatedAt = DateTime.UtcNow
+            };
+            context.Users.Add(driver);
+            await context.SaveChangesAsync();
+            context.DriverDetails.Add(new DriverDetail { UserId = driver.Id });
+        }
 
-        context.Users.AddRange(customer, driver);
+        if (!await context.Users.AnyAsync(u => u.Email == "admin@example.com"))
+        {
+            var admin = new User
+            {
+                FullName = "Platform Admin",
+                Email = "admin@example.com",
+                PasswordHash = BC.HashPassword("password123"),
+                Role = "Admin",
+                Phone = "0119998888",
+                CreatedAt = DateTime.UtcNow
+            };
+            context.Users.Add(admin);
+        }
+
         await context.SaveChangesAsync();
 
-        // 2. Seed Driver Details
-        context.DriverDetails.Add(new DriverDetail { UserId = driver.Id });
-
         // 3. Seed Merchants
-        var merchant = new Merchant
+        if (!await context.Merchants.AnyAsync())
         {
             Name = "Kagiso Grill & Burger",
             Category = "Fast Food",
