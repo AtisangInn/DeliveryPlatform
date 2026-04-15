@@ -8,8 +8,42 @@ using System.Text.Json.Serialization;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+if (!string.IsNullOrEmpty(connectionString))
+{
+    // Sanitize: Trim and remove accidental surrounding quotes
+    connectionString = connectionString.Trim().Trim('"');
+
+    // Automatically handle postgres:// URIs (common when copying from dashboards)
+    if (connectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase))
+    {
+        try
+        {
+            var uri = new Uri(connectionString);
+            var db = uri.AbsolutePath.Trim('/');
+            var userPass = uri.UserInfo.Split(':');
+            
+            var host = uri.Host;
+            var port = uri.Port > 0 ? uri.Port : 5432;
+            var user = userPass[0];
+            var pass = userPass.Length > 1 ? Uri.UnescapeDataString(userPass[1]) : "";
+
+            connectionString = $"Host={host};Port={port};Database={db};Username={user};Password={pass};SSL Mode=Require;Trust Server Certificate=true;";
+            Console.WriteLine("--> Persistence: Detected postgres:// URI. Converted to ADO.NET format.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"--> Persistence Error: Failed to parse connection URI: {ex.Message}");
+        }
+    }
+    
+    // Log metadata for debugging without exposing secrets
+    Console.WriteLine($"--> Persistence: Connection string loaded (Length: {connectionString.Length})");
+}
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(connectionString));
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
