@@ -88,9 +88,10 @@ builder.Services.AddScoped<DeliveryPlatform.Api.Services.Interfaces.IOrderServic
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll",
-        b => b.AllowAnyOrigin()
+        b => b.SetIsOriginAllowed(_ => true) // Allow any origin but specifically allow credentials
               .AllowAnyMethod()
-              .AllowAnyHeader());
+              .AllowAnyHeader()
+              .AllowCredentials());
 });
 
 var app = builder.Build();

@@ -3,89 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Nexus Driver</title>
+    <title>Nexus Courier - Performance Terminal</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="driver-body">
 
-<div class="mobile-app">
-
-    <!-- Login View -->
-    <div id="view-login" class="view" style="justify-content: center;">
-        <div style="text-align: center; margin-bottom: 2rem;">
-            <div style="width: 80px; height: 80px; background: var(--primary); border-radius: 24px; margin: 0 auto 1.5rem auto; display: flex; align-items: center; justify-content: center; color: white;">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    <!-- Auth Layer -->
+    <div id="view-login" class="full-view driver-auth-bg">
+        <div class="auth-box">
+            <div class="brand">
+                <span class="logo-orb secondary">D</span>
+                <h1>COURIER</h1>
             </div>
-            <h1>Driver Portal</h1>
-            <p>Sign in to start delivering.</p>
+            <h2>Logistics Node Alpha</h2>
+            <form id="loginForm">
+                <input type="email" id="email" placeholder="Courier ID (Email)" required>
+                <input type="password" id="password" placeholder="Passkey" required>
+                <button type="submit" id="loginBtn" class="secondary-btn">Initiate Shift</button>
+            </form>
         </div>
-
-        <form id="loginForm">
-            <input type="email" id="email" placeholder="driver@deliverlocal.com" value="driver@deliverlocal.com" required>
-            <input type="password" id="password" placeholder="Password" value="password" required>
-            <button type="submit" class="primary" id="loginBtn">Go Online</button>
-        </form>
     </div>
 
-    <!-- Main App Wrapper -->
-    <div id="app-content" class="hidden" style="height: 100%; display: flex; flex-direction: column;">
+    <!-- MAIN APP SHELL -->
+    <div id="app-content" class="hidden">
         
-        <header style="padding: 1.5rem; background: var(--bg-card); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border);">
-            <div>
-                <p style="font-size: 0.8rem; margin: 0; color: var(--success); font-weight: 600;">STATUS: ONLINE</p>
-                <h2 style="font-size: 1.1rem; margin-top: 0.2rem;">Searching for Orders...</h2>
+        <!-- HEADER -->
+        <header class="driver-header">
+            <div class="courier-profile">
+                <div class="avatar">⚡</div>
+                <div class="profile-text">
+                    <span id="courierName">Courier #001</span>
+                    <label class="status-pill online">ONLINE</label>
+                </div>
+            </div>
+            <div class="shift-stats">
+                <div class="stat">
+                    <label>EARNED</label>
+                    <span id="earnedToday">R0.00</span>
+                </div>
             </div>
         </header>
 
-        <!-- Home View -->
-        <div id="view-home" class="view">
+        <!-- VIEWS -->
+        <main class="view-container">
             
-            <div class="radar active" id="radarAnim"></div>
-            
-            <h2 style="margin-top: 1rem; font-size: 1.1rem;">Available Orders</h2>
-            <div id="availableOrdersList">
-                <p style="text-align: center; margin-top: 2rem;">Waiting for new requests...</p>
-                <!-- SignalR injects orders here -->
-            </div>
-        </div>
+            <!-- RADAR: Searching for Jobs -->
+            <section id="view-radar" class="view">
+                <div class="radar-container">
+                    <div class="radar-circle"></div>
+                    <div class="radar-circle delay-1"></div>
+                    <div class="radar-circle delay-2"></div>
+                    <div class="radar-center">📡</div>
+                </div>
+                <div class="radar-status">
+                    <h2>Scanning for Requests...</h2>
+                    <p>Maintain your position in Kagiso for optimal ping.</p>
+                </div>
 
-        <!-- Active Order View -->
-        <div id="view-active" class="view hidden">
-            <h1>Current Delivery</h1>
-            <div id="map" style="height: 300px; width: 100%; border-radius: 12px; margin-bottom: 1rem; border: 1px solid var(--border);"></div>
-            <p style="font-size: 0.7rem; color: var(--text-muted); text-align: center; margin-bottom: 0.5rem;">[SIMULATION] Click anywhere on map to move the driver icon.</p>
-            
-            <div class="card" id="activeOrderCard">
-                <h3 id="activeMerchantName">Loading...</h3>
-                <p id="activeAddress">...</p>
-                <p style="font-weight: 600; font-size: 1.2rem; color: var(--primary); margin: 0.5rem 0;" id="activeAmount"></p>
+                <div id="availableOrdersList" class="request-queue">
+                    <!-- Request cards -->
+                </div>
+            </section>
+
+            <!-- ACTIVE: Current Delivery -->
+            <section id="view-active" class="view hidden full-map-view">
+                <div id="driverMap"></div>
                 
-                <button class="primary" id="btnPickupOrder" onclick="updateOrderStatus('PickedUp')" style="margin-top: 1rem;">Confirm Pickup</button>
-                <button class="primary success hidden" id="btnDeliverOrder" onclick="updateOrderStatus('Delivered')" style="margin-top: 1rem;">Complete Delivery</button>
-            </div>
-        </div>
+                <div class="job-status-sheet">
+                    <div class="job-header">
+                        <div class="job-merchant">
+                            <h3 id="activeMerchantName">Store Name</h3>
+                            <p id="activeAddress">Delivery Address</p>
+                        </div>
+                        <div class="job-payout" id="activeAmount">R0.00</div>
+                    </div>
 
-        <!-- Bottom Navigation -->
-        <nav class="bottom-nav">
-            <div class="nav-btn active" onclick="switchView('home', this)">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                Requests
-            </div>
-            <div class="nav-btn" onclick="switchView('active', this)">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-                Map
-            </div>
-            <div class="nav-btn" onclick="logout()">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
-                Offline
-            </div>
+                    <div class="workflow-actions">
+                        <button id="btnPickupOrder" class="workflow-btn pickup" onclick="updateOrderStatus('PickedUp')">
+                            CONFIRM PICKUP
+                        </button>
+                        <button id="btnDeliverOrder" class="workflow-btn deliver hidden" onclick="updateOrderStatus('Delivered')">
+                            CONFIRM DELIVERY
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- BOTTOM NAV -->
+        <nav class="bottom-nav menu-fixed">
+            <button class="nav-btn active" onclick="switchView('radar', this)">
+                <span class="nav-icon">🎯</span>
+                <label>Radar</label>
+            </button>
+            <button class="nav-btn" onclick="switchView('active', this)">
+                <span class="nav-icon">📦</span>
+                <label>Active</label>
+            </button>
+            <button class="nav-btn" onclick="logout()">
+                <span class="nav-icon">🔌</span>
+                <label>End Shift</label>
+            </button>
         </nav>
     </div>
-</div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>

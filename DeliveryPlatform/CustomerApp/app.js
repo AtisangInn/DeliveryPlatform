@@ -1,394 +1,282 @@
 const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
     ? 'http://localhost:5000/api' 
-    : 'https://deliveryplatform.onrender.com/api'; // Live Render API URL
+    : 'https://deliveryplatform.onrender.com/api';
 
-let authToken = localStorage.getItem('nexus_cust_token');
-let userName = localStorage.getItem('nexus_cust_name');
+// --- STATE ---
+let state = {
+    authToken: localStorage.getItem('nexus_cust_token'),
+    userName: localStorage.getItem('nexus_cust_name'),
+    activeView: 'home',
+    merchants: [],
+    selectedMerchant: null,
+    cart: [],
+    activeOrder: null, // Full order object when tracking
+    markers: {
+        merchant: null,
+        customer: null,
+        driver: null
+    }
+};
+
 let hubConnection = null;
-let merchantMarkers = {};
-let driverMarkers = {};
+let customerMap = null;
 const KAGISO_COORDS = [-26.175, 27.882];
 
-// Cart State
-let cart = []; // Array of { id, name, price, qty }
+// --- INIT ---
+async function init() {
+    setupUI();
+    if (state.authToken) {
+        showApp();
+    } else {
+        switchView('login');
+    }
+}
 
-// DOM
-const loginForm = document.getElementById('loginForm');
-const merchantList = document.getElementById('merchantList');
-const menuItemsList = document.getElementById('menuItemsList');
-
-// Switch logic
-function switchView(viewId, navElement = null) {
-    document.querySelectorAll('.view').forEach(v => {
-        if(v.id !== 'view-login') v.classList.add('hidden');
-    });
+function showApp() {
+    document.getElementById('view-login').classList.add('hidden');
+    document.getElementById('app-content').classList.remove('hidden');
+    document.getElementById('currentLocation').textContent = "123 Sandton Dr, Kagiso";
     
+    refreshMerchants();
+    connectHub();
+    checkActiveOrders();
+}
+
+// --- NAVIGATION ---
+function switchView(viewId, navBtn) {
+    state.activeView = viewId;
+    document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
     document.getElementById(`view-${viewId}`).classList.remove('hidden');
-    
-    // Handle nav highlight if clicked from bottom bar
-    if(navElement) {
+
+    if (navBtn) {
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        navElement.classList.add('active');
+        navBtn.classList.add('active');
     }
-    
-    if (viewId === 'home') loadMerchants();
-    if (viewId === 'cart') renderCart();
-    if (viewId === 'orders') loadOrders();
+
+    if (viewId === 'home') refreshMerchants();
+    if (viewId === 'tracking') initTrackingView();
 }
 
-// Initialization
-function init() {
-    if (authToken) {
-        document.getElementById('view-login').classList.add('hidden');
-        document.getElementById('app-content').classList.remove('hidden');
-        document.getElementById('userNameDisplay').textContent = userName || 'Customer';
-        loadMerchants();
-        connectSignalR();
+// --- DATA & SYNC ---
+async function refreshMerchants() {
+    state.merchants = await apiGet('Merchant');
+    renderMerchants();
+}
+
+async function checkActiveOrders() {
+    const orders = await apiGet('Order');
+    const active = orders.find(o => ['Paid', 'Assigned', 'PickedUp', 'Preparing', 'OutForDelivery'].includes(o.status));
+    if (active) {
+        state.activeOrder = active;
+        hubConnection?.invoke("JoinOrder", active.id);
+        switchView('tracking', document.querySelectorAll('.nav-btn')[1]);
     }
 }
 
-async function connectSignalR() {
-    if (!authToken) return;
-    
-    const hubUrl = API_URL.replace('/api', '/orderhub');
-    
+async function connectHub() {
+    if (hubConnection) return;
     hubConnection = new signalR.HubConnectionBuilder()
-        .withUrl(hubUrl, {
-            accessTokenFactory: () => authToken
-        })
+        .withUrl(API_URL.replace('/api', '/orderhub'), { accessTokenFactory: () => state.authToken })
         .withAutomaticReconnect()
         .build();
 
     hubConnection.on("StatusUpdated", (data) => {
-        console.log("Order Status Update:", data);
-        const ordersView = document.getElementById('view-orders');
-        if (!ordersView.classList.contains('hidden')) {
-            loadOrders();
+        if (state.activeOrder && data.orderId === state.activeOrder.id) {
+            state.activeOrder.status = data.status;
+            renderTracking();
         }
-        // Custom premium toast instead of alert (simulated for now)
-        console.log(`Notification: Order #${data.orderId} is now ${data.status}`);
     });
 
     hubConnection.on("DriverLocationUpdated", (data) => {
-        console.log("DRIVER MOVE:", data);
-        updateDriverMarker(data.lat, data.lng);
-    });
-
-    try {
-        await hubConnection.start();
-        console.log("Customer SignalR Connected!");
-    } catch (err) {
-        console.error("Customer SignalR Connection Error: ", err);
-    }
-}
-
-// Authentication
-if (loginForm) {
-    loginForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
-        const btn = document.getElementById('loginBtn');
-        btn.textContent = 'Verifying...';
-        
-        try {
-            const response = await fetch(`${API_URL}/Auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
-            });
-            
-            if (!response.ok) throw new Error('Invalid credentials');
-            const data = await response.json();
-            
-            authToken = data.token;
-            userName = data.fullName;
-            localStorage.setItem('nexus_cust_token', authToken);
-            localStorage.setItem('nexus_cust_name', userName);
-            
-            document.getElementById('view-login').classList.add('hidden');
-            document.getElementById('app-content').classList.remove('hidden');
-            document.getElementById('userNameDisplay').textContent = userName;
-            loadMerchants();
-        } catch (err) {
-            alert(err.message);
-        } finally {
-            btn.textContent = 'Sign In';
+        if (state.activeOrder && data.orderId === state.activeOrder.id) {
+            updateDriverMarker(data.lat, data.lng);
         }
     });
+
+    try { await hubConnection.start(); } catch (e) { console.error("Hub fail", e); }
 }
 
-function logout() {
-    localStorage.removeItem('nexus_cust_token');
-    localStorage.removeItem('nexus_cust_name');
-    authToken = null;
-    document.getElementById('view-login').classList.remove('hidden');
-    document.getElementById('app-content').classList.add('hidden');
-}
-
-async function apiGet(endpoint) {
-    const res = await fetch(`${API_URL}/${endpoint}`, {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-    });
-    if(res.status === 401) logout();
-    return await res.json();
-}
-
-// Data Loading
-async function loadMerchants() {
-    try {
-        const merchants = await apiGet('Merchant');
-        let html = '';
-        merchants.forEach(m => {
-            html += `
-                <div class="merchant-card" onclick="openMerchant(${m.id})">
-                    <div class="m-img">🍔</div>
-                    <div>
-                        <h3 style="color: var(--text-dark); margin-bottom: 0.25rem;">${m.name}</h3>
-                        <p style="font-size: 0.8rem;">${m.category} • 15-25 min</p>
-                    </div>
-                </div>
-            `;
-        });
-        merchantList.innerHTML = html || '<p>No merchants online.</p>';
-    } catch {
-        merchantList.innerHTML = '<p>Error fetching data.</p>';
-    }
-}
-
-async function loadOrders() {
-    const ordersContainer = document.getElementById('view-orders');
-    ordersContainer.innerHTML = '<h1>Your Orders</h1><p style="text-align: center; margin-top: 2rem;">Loading...</p>';
-
-    try {
-        const orders = await apiGet('Order');
-        renderOrders(orders);
-    } catch (e) {
-        ordersContainer.innerHTML = '<h1>Your Orders</h1><p>Failed to load orders.</p>';
-    }
-}
-
-function renderOrders(orders) {
-    const ordersContainer = document.getElementById('view-orders');
-    let html = '<h1>Your Orders</h1>';
-    
-    if (!orders || orders.length === 0) {
-        html += '<p style="text-align: center; margin-top: 2rem;">No active orders.</p>';
-    } else {
-        orders.forEach(o => {
-            let statusColor = '#6B7280'; // Muted
-            if (o.status === 'Paid') statusColor = '#2563EB'; // Blue
-            if (o.status === 'Assigned' || o.status === 'PickedUp') statusColor = '#F59E0B'; // Orange
-            if (o.status === 'Delivered') statusColor = '#10B981'; // Green
-
-            html += `
-                <div class="merchant-card" style="cursor: default; display: block; padding: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div>
-                            <h3 style="margin:0;">${o.merchant ? o.merchant.name : 'Unknown Merchant'}</h3>
-                            <p style="font-size: 0.8rem; margin: 0.3rem 0;">#${o.id} • ${new Date(o.createdAt).toLocaleDateString()}</p>
-                        </div>
-                        <span style="background: ${statusColor}; color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 700;">
-                            ${o.status.toUpperCase()}
-                        </span>
-                    </div>
-                    <div style="margin-top: 0.8rem; border-top: 1px dashed #E5E7EB; padding-top: 0.8rem; display: flex; justify-content: space-between;">
-                        <span style="font-size: 0.9rem;">Total Amount</span>
-                        <strong style="color: var(--primary);">R${o.totalAmount.toFixed(2)}</strong>
-                    </div>
-                </div>
-            `;
-        });
-    }
-    
-    ordersContainer.innerHTML = html;
-
-    // Check if there's an active delivery to show the map
-    const activeOrder = orders.find(o => o.status === 'Paid' || o.status === 'Assigned' || o.status === 'PickedUp');
-    if (activeOrder) {
-        document.getElementById('tracking-container').classList.remove('hidden');
-        initTrackingMap(activeOrder);
-    } else {
-        document.getElementById('tracking-container').classList.add('hidden');
-    }
-}
-
-function initTrackingMap(order) {
-    if (customerMap) return;
-    
-    customerMap = L.map('customer-map', { zoomControl: false }).setView(KAGISO_COORDS, 15);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(customerMap);
-
-    // 1. Store Marker
-    L.marker([-26.175, 27.882], {
-        icon: L.divIcon({
-            className: 'store-pin',
-            html: `<div style="background:var(--primary); width:32px; height:32px; border-radius:50%; border:2px solid white; display:flex; align-items:center; justify-content:center; color:white;">🏪</div>`,
-            iconSize: [32, 32]
-        })
-    }).addTo(customerMap).bindPopup("<b>Merchant</b><br>Preparing your order...");
-
-    // 2. Delivery Marker (Home)
-    L.marker(KAGISO_COORDS, {
-        icon: L.divIcon({
-            className: 'home-pin',
-            html: `<div style="background:#111; width:32px; height:32px; border-radius:50%; border:2px solid white; display:flex; align-items:center; justify-content:center; color:white;">🏠</div>`,
-            iconSize: [32, 32]
-        })
-    }).addTo(customerMap).bindPopup("<b>Your Home</b>");
-
-    // 3. Driver Marker
-    driverMarker = L.marker([-26.18, 27.88], {
-        icon: L.divIcon({
-            className: 'driver-pin',
-            html: `<div style="background:var(--success); width:36px; height:36px; border-radius:50%; border:2px solid white; display:flex; align-items:center; justify-content:center; color:white; box-shadow:0 0 15px var(--primary-glow)">🏍️</div>`,
-            iconSize: [36, 36]
-        })
-    }).addTo(customerMap).bindPopup("<b>Driver</b><br>En route...");
-}
-
-function updateDriverMarker(lat, lng) {
-    if (driverMarker) {
-        driverMarker.setLatLng([lat, lng]);
-        // Optional: Auto-pan map to follow driver
-        // customerMap.panTo([lat, lng]);
-    }
+// --- RENDERING ---
+function renderMerchants() {
+    const list = document.getElementById('merchantList');
+    list.innerHTML = state.merchants.map(m => `
+        <div class="merchant-card" onclick="openMerchant(${m.id})">
+            <div class="m-icon">🍔</div>
+            <div class="m-info">
+                <h3>${m.name}</h3>
+                <p>${m.category} • 15-25 min</p>
+            </div>
+        </div>
+    `).join('');
 }
 
 async function openMerchant(id) {
+    const m = state.merchants.find(x => x.id === id);
+    state.selectedMerchant = m;
     switchView('menu');
-    menuItemsList.innerHTML = '<p>Loading menu...</p>';
+    document.getElementById('menuMerchantName').textContent = m.name;
+    document.getElementById('menuMerchantCategory').textContent = m.category;
     
-    try {
-        const merchant = await apiGet(`Merchant/${id}`);
-        document.getElementById('menuMerchantName').textContent = merchant.name;
-        document.getElementById('menuMerchantCategory').textContent = merchant.category;
-        
-        let html = '';
-        
-        // Let's generate fake menu items if none exist, just for the simulation
-        const fakeMenu = [
-            { id: 101, name: 'Classic Burger', desc: 'Beef, cheese, lettuce', price: 85.00 },
-            { id: 102, name: 'Large Chips', desc: 'Locally sourced potatoes', price: 35.00 },
-            { id: 103, name: 'Soda Can', desc: '330ml Ice cold', price: 20.00 }
-        ];
+    // Simulate/Fetch Menu
+    const menuItems = m.menuItems?.length ? m.menuItems : [
+        { id: 101, name: 'Nexus Burger', description: 'Double beef, secret sauce', price: 95 },
+        { id: 102, name: 'Fries', description: 'Large cut, sea salt', price: 35 }
+    ];
 
-        const itemsToShow = (merchant.menuItems && merchant.menuItems.length > 0) ? merchant.menuItems : fakeMenu;
-
-        itemsToShow.forEach(item => {
-            html += `
-                <div class="menu-item">
-                    <div>
-                        <h4 style="color: var(--text-dark); font-size: 1rem;">${item.name}</h4>
-                        <p style="font-size: 0.75rem; margin-bottom: 0.5rem; max-width: 200px;">${item.desc || item.description || ''}</p>
-                        <strong style="color: var(--primary);">R${item.price.toFixed(2)}</strong>
-                    </div>
-                    <button class="add-btn" onclick="addToCart(${item.id}, '${item.name}', ${item.price})">+</button>
-                </div>
-            `;
-        });
-        
-        menuItemsList.innerHTML = html;
-        
-    } catch {
-        menuItemsList.innerHTML = '<p>Failed to load menu.</p>';
-    }
+    document.getElementById('menuItemsList').innerHTML = menuItems.map(item => `
+        <div class="menu-item">
+            <div>
+                <h4>${item.name}</h4>
+                <p style="font-size:0.75rem; color:var(--text-secondary)">${item.description}</p>
+                <strong style="color:var(--primary)">R${item.price.toFixed(2)}</strong>
+            </div>
+            <button class="add-btn" onclick="addToCart(${item.id}, '${item.name}', ${item.price})">+</button>
+        </div>
+    `).join('');
 }
 
-// Cart Logic
-function addToCart(id, name, price) {
-    const existing = cart.find(i => i.id === id);
-    if(existing) {
-        existing.qty++;
-    } else {
-        cart.push({ id, name, price, qty: 1 });
-    }
-    updateCartIcon();
-    
-    // Haptic feedback simulation
-    if(navigator.vibrate) navigator.vibrate(50);
-}
-
-function updateCartIcon() {
-    const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
-    document.getElementById('cartCount').textContent = totalQty;
-}
-
-function renderCart() {
-    const cartItemsList = document.getElementById('cartItemsList');
-    const cartTotalBox = document.getElementById('cartTotalBox');
-    const promoBox = document.getElementById('promoBox');
-    
-    if (cart.length === 0) {
-        cartItemsList.innerHTML = '<p style="text-align: center; margin-top: 2rem;">Your cart is empty.</p>';
-        cartTotalBox.style.display = 'none';
-        promoBox.style.display = 'none';
+function initTrackingView() {
+    if (!state.activeOrder) {
+        document.getElementById('view-tracking').innerHTML = `
+            <div style="padding: 4rem 2rem; text-align:center">
+                <h2>No Active Orders</h2>
+                <p style="color:var(--text-secondary); margin-top:1rem">Order some food to start tracking.</p>
+                <button class="primary-btn" style="margin-top:2rem" onclick="switchView('home')">Go Shopping</button>
+            </div>
+        `;
         return;
     }
     
-    let html = '';
-    let subtotal = 0;
-    
-    cart.forEach(item => {
-        const itemTotal = item.price * item.qty;
-        subtotal += itemTotal;
-        html += `
-            <div class="cart-item">
-                <div style="flex:1;">
-                    <div style="font-weight: 500; color: var(--text-dark);">${item.qty}x ${item.name}</div>
-                    <div style="font-size: 0.8rem; color: var(--text-muted);">Remove</div>
-                </div>
-                <div style="font-weight: 600; color: var(--text-dark);">R${itemTotal.toFixed(2)}</div>
-            </div>
-        `;
+    if (!customerMap) {
+        customerMap = L.map('customerMap', { zoomControl: false }).setView(KAGISO_COORDS, 15);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(customerMap);
+    }
+    renderTracking();
+}
+
+function renderTracking() {
+    const o = state.activeOrder;
+    if (!o) return;
+
+    document.getElementById('trackStatus').textContent = o.status.replace(/([A-Z])/g, ' $1').trim();
+    document.getElementById('trackOrderId').textContent = o.id.toString().padStart(4, '0');
+
+    // Update Path Steps
+    const statusMap = { 'Paid': 1, 'Assigned': 2, 'Preparing': 2, 'PickedUp': 3, 'OutForDelivery': 3, 'Delivered': 4 };
+    const currentStep = statusMap[o.status] || 1;
+
+    document.querySelectorAll('.path-step').forEach((s, idx) => {
+        s.classList.remove('completed', 'active');
+        if (idx + 1 < currentStep) s.classList.add('completed');
+        if (idx + 1 === currentStep) s.classList.add('active');
     });
+
+    // Map Markers
+    if (!state.markers.customer) {
+        state.markers.customer = L.marker([o.deliveryLatitude, o.deliveryLongitude], {
+            icon: L.divIcon({ className: 'nexus-pin pin-customer', html: '🏠', iconSize: [30,30] })
+        }).addTo(customerMap);
+    }
+
+    if (o.merchant && !state.markers.merchant) {
+        state.markers.merchant = L.marker([o.merchant.latitude, o.merchant.longitude], {
+            icon: L.divIcon({ className: 'nexus-pin pin-merchant', html: '🏪', iconSize: [30,30] })
+        }).addTo(customerMap);
+    }
+}
+
+function updateDriverMarker(lat, lng) {
+    if (!customerMap) return;
+    document.getElementById('driverDetails').classList.remove('hidden');
     
-    cartItemsList.innerHTML = html;
+    if (!state.markers.driver) {
+        state.markers.driver = L.marker([lat, lng], {
+            icon: L.divIcon({ className: 'nexus-pin pin-driver', html: '🏍️', iconSize: [36,36] })
+        }).addTo(customerMap);
+    } else {
+        state.markers.driver.setLatLng([lat, lng]);
+    }
+    customerMap.panTo([lat, lng]);
+}
+
+// --- CART & CHECKOUT ---
+function addToCart(id, name, price) {
+    const existing = state.cart.find(i => i.id === id);
+    if(existing) existing.qty++;
+    else state.cart.push({ id, name, price, qty: 1 });
+    renderCart();
+}
+
+function renderCart() {
+    const count = state.cart.reduce((s, i) => s + i.qty, 0);
+    document.getElementById('cartCount').textContent = count;
     
+    const subtotal = state.cart.reduce((s, i) => s + (i.price * i.qty), 0);
     document.getElementById('cartSubtotal').textContent = `R${subtotal.toFixed(2)}`;
     document.getElementById('cartTotal').textContent = `R${(subtotal + 20).toFixed(2)}`;
     
-    cartTotalBox.style.display = 'block';
-    promoBox.style.display = 'flex';
+    document.getElementById('cartItemsList').innerHTML = state.cart.map(item => `
+        <div class="cart-item" style="display:flex; justify-content:space-between; margin-bottom:1rem">
+            <span>${item.qty}x ${item.name}</span>
+            <strong>R${(item.price * item.qty).toFixed(2)}</strong>
+        </div>
+    `).join('');
 }
 
 async function processCheckout() {
     const btn = document.getElementById('checkoutBtn');
-    btn.textContent = 'Processing...';
-
-    // Build the request matching the C# CheckoutRequest model
+    btn.textContent = 'INITIATING SECURE PAYMENT...';
+    
     const payload = {
-        merchantId: 1, // Hardcoded for this milestone logic demonstration
-        deliveryAddress: "123 Sandton Dr",
-        items: cart.map(i => ({ menuItemId: i.id, name: i.name, quantity: i.qty, price: i.price }))
+        merchantId: state.selectedMerchant.id,
+        deliveryAddress: "123 Sandton Dr, Kagiso",
+        items: state.cart.map(i => ({ menuItemId: i.id, quantity: i.qty }))
     };
 
     try {
-        const response = await fetch(`${API_URL}/Order/checkout`, {
+        const res = await fetch(`${API_URL}/Order/checkout`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`
-            },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.authToken}` },
             body: JSON.stringify(payload)
         });
-
-        if (!response.ok) {
-            const errTxt = await response.text();
-            throw new Error(`API Error: ${response.status} - ${errTxt}`);
-        }
-        
-        const data = await response.json();
-        
-        // Use document.write to cleanly execute the script tag inside the HTML
-        document.open();
-        document.write(data.paymentHtmlForm);
-        document.close();
-        
-    } catch (err) {
-        alert(err.message);
-        btn.textContent = 'Checkout & Pay';
-    }
+        const data = await res.json();
+        document.open(); document.write(data.paymentHtmlForm); document.close();
+    } catch (e) { alert("Checkout failed"); }
 }
+
+// --- CORE UTILS ---
+async function apiGet(endpoint) {
+    const res = await fetch(`${API_URL}/${endpoint}`, { headers: { 'Authorization': `Bearer ${state.authToken}` } });
+    if(res.status === 401) logout();
+    return await res.json();
+}
+
+function setupUI() {
+    document.getElementById('loginForm').addEventListener('submit', handleLogin);
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    const btn = document.getElementById('loginBtn');
+    btn.textContent = 'AUTHENTICATING...';
+    try {
+        const res = await fetch(`${API_URL}/Auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: document.getElementById('email').value, password: document.getElementById('password').value })
+        });
+        const data = await res.json();
+        state.authToken = data.token;
+        state.userName = data.fullName;
+        localStorage.setItem('nexus_cust_token', data.token);
+        localStorage.setItem('nexus_cust_name', data.fullName);
+        showApp();
+    } catch (e) { alert("Login failed"); btn.textContent = "Sign In"; }
+}
+
+function toggleCart() { document.getElementById('cartSheet').classList.toggle('hidden'); }
+document.getElementById('cartBtn').addEventListener('click', toggleCart);
+
+function logout() { localStorage.clear(); location.reload(); }
 
 init();

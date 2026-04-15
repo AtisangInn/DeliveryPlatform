@@ -29,6 +29,11 @@ public class OrderHub : Hub
         await base.OnConnectedAsync();
     }
 
+    public async Task JoinOrder(int orderId)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"Order_{orderId}");
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         var role = Context.User?.FindFirstValue(ClaimTypes.Role);

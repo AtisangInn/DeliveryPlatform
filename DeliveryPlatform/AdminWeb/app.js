@@ -1,48 +1,29 @@
 const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
     ? 'http://localhost:5000/api' 
-    : 'https://deliveryplatform.onrender.com/api'; // Live Render API URL
+    : 'https://deliveryplatform.onrender.com/api';
 
-let authToken = localStorage.getItem('nexus_token');
-let adminName = localStorage.getItem('nexus_admin');
+// --- PLATFORM STATE ---
+let state = {
+    authToken: localStorage.getItem('nexus_token'),
+    adminName: localStorage.getItem('nexus_admin'),
+    activeView: 'dashboard',
+    merchants: [],
+    orders: [],
+    feed: [],
+    markers: {
+        merchants: {},
+        drivers: {},
+        customers: {}
+    }
+};
+
 let hubConnection = null;
 let adminMap = null;
-let driverMarkers = {};
-let merchantMarkers = {};
 
-// DOM Elements
-const loginView = document.getElementById('loginView');
-const appView = document.getElementById('appView');
-const loginForm = document.getElementById('loginForm');
-const logoutBtn = document.getElementById('logoutBtn');
-const merchantTableBody = document.getElementById('merchantTableBody');
-
-// Navigation
-document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', (e) => {
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        item.classList.add('active');
-        
-        const viewName = item.getAttribute('data-view');
-        document.querySelectorAll('.content-panel').forEach(panel => panel.classList.add('hidden'));
-        document.getElementById(`view-${viewName}`).classList.remove('hidden');
-        
-        const titles = {
-            'dashboard': { title: 'System Overview', sub: 'Real-time metrics and platform telemetry' },
-            'merchants': { title: 'Merchants & Menus', sub: 'Manage registered entities and inventory' },
-            'orders': { title: 'Active Orders', sub: 'Live logistics tracing' },
-            'drivers': { title: 'Driver Fleet', sub: 'Courier management and status' }
-        };
-        
-        document.getElementById('viewTitle').textContent = titles[viewName].title;
-        document.getElementById('viewSubtitle').textContent = titles[viewName].sub;
-        
-        if (viewName === 'merchants') loadMerchants();
-    });
-});
-
-// Initialization
-function init() {
-    if (authToken) {
+// --- INITIALIZATION ---
+async function init() {
+    setupEventListeners();
+    if (state.authToken) {
         showApp();
     } else {
         showLogin();
@@ -50,194 +31,228 @@ function init() {
 }
 
 function showLogin() {
-    loginView.classList.remove('hidden');
-    appView.classList.add('hidden');
+    document.getElementById('loginView').classList.remove('hidden');
+    document.getElementById('appView').classList.add('hidden');
 }
 
-function showApp() {
-    loginView.classList.add('hidden');
-    appView.classList.remove('hidden');
-    document.getElementById('adminNameDisplay').textContent = adminName || 'System Admin';
-    loadDashboardStats();
-    initAdminMap();
-    initHub();
-}
-
-// Auth
-loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    const errorEl = document.getElementById('loginError');
-    const btn = document.getElementById('loginBtn');
+async function showApp() {
+    document.getElementById('loginView').classList.add('hidden');
+    document.getElementById('appView').classList.remove('hidden');
     
-    btn.textContent = 'Authenticating...';
-    
-    try {
-        const response = await fetch(`${API_URL}/Auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
-        
-        if (!response.ok) throw new Error('Invalid security protocol');
-        
-        const data = await response.json();
-        
-        if(data.role !== 'Admin') throw new Error('Unauthorized clearance level');
-
-        authToken = data.token;
-        adminName = data.fullName;
-        localStorage.setItem('nexus_token', authToken);
-        localStorage.setItem('nexus_admin', adminName);
-        
-        showApp();
-    } catch (err) {
-        errorEl.textContent = err.message;
-        errorEl.classList.remove('hidden');
-    } finally {
-        btn.textContent = 'Authenticate ->';
-    }
-});
-
-logoutBtn.addEventListener('click', () => {
-    localStorage.removeItem('nexus_token');
-    localStorage.removeItem('nexus_admin');
-    authToken = null;
-    showLogin();
-});
-
-// APIs
-async function apiGet(endpoint) {
-    const res = await fetch(`${API_URL}/${endpoint}`, {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-    });
-    if(res.status === 401) logoutBtn.click();
-    return await res.json();
+    initMap();
+    await connectHub();
+    await refreshData();
 }
 
-async function loadDashboardStats() {
-    try {
-        const merchants = await apiGet('Merchant');
-        document.getElementById('statMerchants').textContent = merchants.length;
-        
-        // Add merchants to map
-        merchants.forEach(m => {
-            if (!merchantMarkers[m.id]) {
-                const marker = L.marker([-26.175, 27.882], { // Mock coord for Kagiso if not in DB
-                    icon: L.divIcon({
-                        className: 'merchant-pin',
-                        html: `<div style="background:var(--primary); width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; border:2px solid white; box-shadow:0 0 10px rgba(0,0,0,0.5)">🏪</div>`,
-                        iconSize: [30, 30]
-                    })
-                }).addTo(adminMap).bindPopup(`<b>${m.name}</b><br>${m.address}`);
-                merchantMarkers[m.id] = marker;
-            }
-        });
-    } catch (e) { console.error('Data pull failed', e); }
-}
-
-function initAdminMap() {
+function initMap() {
     if (adminMap) return;
     adminMap = L.map('adminMap', { zoomControl: false }).setView([-26.175, 27.882], 13);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
+        attribution: '&copy; OpenStreetMap'
     }).addTo(adminMap);
 }
 
-async function initHub() {
+// --- NETWORK & HUB ---
+async function connectHub() {
     if (hubConnection) return;
     
     hubConnection = new signalR.HubConnectionBuilder()
-        .withUrl(API_URL.replace('/api', '/orderHub'), {
-            accessTokenFactory: () => authToken
+        .withUrl(API_URL.replace('/api', '/orderhub'), {
+            accessTokenFactory: () => state.authToken
         })
         .withAutomaticReconnect()
         .build();
 
-    hubConnection.on("DriverLocationUpdated", (data) => {
-        logEvent(`Driver location updated for Order #${data.orderId}`);
-        updateDriverOnMap(data);
+    hubConnection.on("StatusUpdated", (data) => {
+        logEvent(`[SIGNAL] Order #${data.orderId} transition: ${data.status}`);
+        refreshData();
     });
 
-    hubConnection.on("StatusUpdated", (data) => {
-        logEvent(`Order #${data.orderId} status changed to: <b>${data.status}</b>`);
-        loadDashboardStats(); // Refresh stats
+    hubConnection.on("DriverLocationUpdated", (data) => {
+        updateDriverMarker(data);
     });
 
     try {
         await hubConnection.start();
-        logEvent("Secure telemetry link established.");
+        logEvent("Gateway: Secure telemetry established");
     } catch (err) {
-        console.error("Hub connection failed", err);
+        logEvent("Gateway Error: Connection failed");
+        console.error(err);
     }
 }
 
-function updateDriverOnMap(data) {
-    const { orderId, lat, lng } = data;
-    if (!driverMarkers[orderId]) {
-        driverMarkers[orderId] = L.marker([lat, lng], {
-            icon: L.divIcon({
-                className: 'driver-pin',
-                html: `<div style="background:#10b981; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; border:2px solid white; box-shadow:0 0 10px var(--primary-glow)">🏍️</div>`,
-                iconSize: [30, 30]
-            })
-        }).addTo(adminMap).bindPopup(`Driver for Order #${orderId}`);
-    } else {
-        driverMarkers[orderId].setLatLng([lat, lng]);
-    }
-    adminMap.panTo([lat, lng]);
-}
-
-function logEvent(msg) {
-    const feed = document.getElementById('liveFeed');
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const item = document.createElement('div');
-    item.className = 'feed-item';
-    item.innerHTML = `<span class="feed-time">[${time}]</span> ${msg}`;
-    feed.prepend(item);
-}
-
-async function loadMerchants() {
+async function refreshData() {
     try {
-        merchantTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Pulling records...</td></tr>';
-        const merchants = await apiGet('Merchant');
-        
-        merchantTableBody.innerHTML = '';
-        merchants.forEach(m => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td style="font-family: monospace; color: var(--text-tertiary)">NEX-${m.id.toString().padStart(4, '0')}</td>
-                <td style="font-weight: 500; color: var(--text-primary)">${m.name}</td>
-                <td>${m.category}</td>
-                <td>${m.commissionPercentage}%</td>
-                <td><span class="badge ${m.isActive ? 'active' : 'inactive'}">${m.isActive ? 'OPERATIONAL' : 'OFFLINE'}</span></td>
-            `;
-            merchantTableBody.appendChild(tr);
-        });
+        const [mRes, oRes] = await Promise.all([
+            apiGet('Merchant'),
+            apiGet('Order')
+        ]);
+        state.merchants = mRes;
+        state.orders = oRes;
+        render();
     } catch (e) {
-        console.error(e);
-        merchantTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--danger);">Data synchronization failed</td></tr>';
+        console.error("Sync Error", e);
     }
 }
 
-// Modals Setup
-const merchantModal = document.getElementById('merchantModal');
-document.getElementById('addMerchantBtn').addEventListener('click', () => {
-    merchantModal.classList.remove('hidden');
-});
+async function apiGet(endpoint) {
+    const res = await fetch(`${API_URL}/${endpoint}`, {
+        headers: { 'Authorization': `Bearer ${state.authToken}` }
+    });
+    if(res.status === 401) logout();
+    return await res.json();
+}
 
-document.getElementById('closeModalBtn').addEventListener('click', () => {
-    merchantModal.classList.add('hidden');
-    document.getElementById('merchantForm').reset();
-});
+// --- RENDERING ENGINE ---
+function render() {
+    renderStats();
+    renderFeed();
+    renderOrders();
+    renderMerchants();
+    updateMapPoints();
+}
 
-document.getElementById('merchantForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btn = e.target.querySelector('button[type="submit"]');
-    const ogText = btn.textContent;
-    btn.textContent = 'Deploying...';
+function renderStats() {
+    const totalRev = state.orders
+        .filter(o => o.status === 'Delivered')
+        .reduce((sum, o) => sum + o.totalAmount, 0);
     
+    document.getElementById('statRevenue').textContent = `R${totalRev.toFixed(2)}`;
+    document.getElementById('statOrders').textContent = state.orders.filter(o => o.status !== 'Delivered').length;
+}
+
+function renderFeed() {
+    const list = document.getElementById('liveFeed');
+    if (state.feed.length === 0) return;
+    
+    list.innerHTML = state.feed.map(item => `
+        <div class="feed-item">
+            <span class="feed-time">${item.time}</span>
+            <div>${item.msg}</div>
+        </div>
+    `).join('');
+}
+
+function renderOrders() {
+    const list = document.getElementById('activeOrdersList');
+    const active = state.orders.filter(o => o.status !== 'Delivered');
+    
+    list.innerHTML = active.map(o => `
+        <div class="order-card" onclick="focusOrder(${o.id})">
+            <span class="order-badge ${o.status.toLowerCase()}">${o.status}</span>
+            <div class="order-main">
+                <h4>#${o.id} - ${o.merchant?.name || 'Store'}</h4>
+                <p>${o.deliveryAddress}</p>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderMerchants() {
+    const list = document.getElementById('merchantList');
+    list.innerHTML = state.merchants.map(m => `
+        <div class="feed-item" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>${m.name}</span>
+            <span class="status-indicator live" style="font-size:0.5rem">${m.isActive ? 'ONLINE' : 'OFFLINE'}</span>
+        </div>
+    `).join('');
+}
+
+function updateMapPoints() {
+    // 1. Merchants
+    state.merchants.forEach(m => {
+        if (!state.markers.merchants[m.id]) {
+            state.markers.merchants[m.id] = L.marker([m.latitude, m.longitude], {
+                icon: L.divIcon({ className: 'nexus-pin pin-merchant' })
+            }).addTo(adminMap).bindPopup(`<b>${m.name}</b>`);
+        }
+    });
+
+    // 2. Customers for active orders
+    state.orders.filter(o => o.status !== 'Delivered').forEach(o => {
+        if (!state.markers.customers[o.id]) {
+            state.markers.customers[o.id] = L.marker([o.deliveryLatitude, o.deliveryLongitude], {
+                icon: L.divIcon({ className: 'nexus-pin pin-customer' })
+            }).addTo(adminMap).bindPopup(`Customer - Order #${o.id}`);
+        }
+    });
+}
+
+function updateDriverMarker(data) {
+    const { orderId, lat, lng } = data;
+    if (!state.markers.drivers[orderId]) {
+        state.markers.drivers[orderId] = L.marker([lat, lng], {
+            icon: L.divIcon({ className: 'nexus-pin pin-driver' })
+        }).addTo(adminMap).bindPopup(`Driver - Order #${orderId}`);
+    } else {
+        state.markers.drivers[orderId].setLatLng([lat, lng]);
+    }
+}
+
+// --- UTILS ---
+function logEvent(msg) {
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    state.feed.unshift({ time, msg });
+    if(state.feed.length > 50) state.feed.pop();
+    renderFeed();
+}
+
+function setupEventListeners() {
+    // Auth
+    document.getElementById('loginForm').addEventListener('submit', handleLogin);
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+    
+    // Tabs
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            
+            btn.classList.add('active');
+            const tab = btn.getAttribute('data-tab');
+            document.getElementById(`tab-${tab}`).classList.remove('hidden');
+        });
+    });
+
+    // Modal
+    document.getElementById('addMerchantBtn').addEventListener('click', () => document.getElementById('merchantModal').classList.remove('hidden'));
+    document.getElementById('closeModalBtn').addEventListener('click', () => document.getElementById('merchantModal').classList.add('hidden'));
+    document.getElementById('merchantForm').addEventListener('submit', handleAddMerchant);
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    const btn = document.getElementById('loginBtn');
+    btn.textContent = 'CONNECTING...';
+    
+    try {
+        const res = await fetch(`${API_URL}/Auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: document.getElementById('email').value,
+                password: document.getElementById('password').value
+            })
+        });
+        
+        if (!res.ok) throw new Error('Access Denied');
+        const data = await res.json();
+        
+        state.authToken = data.token;
+        state.adminName = data.fullName;
+        localStorage.setItem('nexus_token', data.token);
+        localStorage.setItem('nexus_admin', data.fullName);
+        
+        showApp();
+    } catch (err) {
+        document.getElementById('loginError').classList.remove('hidden');
+    } finally {
+        btn.textContent = 'INITIALIZE CONNECTION';
+    }
+}
+
+async function handleAddMerchant(e) {
+    e.preventDefault();
     const payload = {
         name: document.getElementById('m_name').value,
         category: document.getElementById('m_category').value,
@@ -247,26 +262,24 @@ document.getElementById('merchantForm').addEventListener('submit', async (e) => 
     };
     
     try {
-        const response = await fetch(`${API_URL}/Merchant`, {
+        const res = await fetch(`${API_URL}/Merchant`, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`
+                'Authorization': `Bearer ${state.authToken}`
             },
             body: JSON.stringify(payload)
         });
-        
-        if (!response.ok) throw new Error('Deployment rejected');
-        
-        document.getElementById('closeModalBtn').click();
-        loadMerchants();
-        loadDashboardStats();
-    } catch (err) {
-        alert(err.message);
-    } finally {
-        btn.textContent = ogText;
-    }
-});
+        if(res.ok) {
+            document.getElementById('merchantModal').classList.add('hidden');
+            refreshData();
+        }
+    } catch (e) { alert("Deployment error"); }
+}
 
-// Boot
+function logout() {
+    localStorage.clear();
+    location.reload();
+}
+
 init();

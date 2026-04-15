@@ -114,30 +114,42 @@ public class OrderService : IOrderService
 
     public async Task<bool> AcceptOrderAsync(int orderId, int driverId)
     {
-        var order = await _context.Orders.FindAsync(orderId);
+        var order = await _context.Orders
+            .Include(o => o.Merchant)
+            .FirstOrDefaultAsync(o => o.Id == orderId);
         if (order == null || order.DriverId != null || order.Status != "Paid") return false;
 
         order.DriverId = driverId;
         order.Status = "Assigned";
         await _context.SaveChangesAsync();
 
-        await _hubContext.Clients.Group($"User_{order.CustomerId}").SendAsync("StatusUpdated", new {
-            OrderId = order.Id,
-            Status = order.Status
-        });
-
-        await _hubContext.Clients.Group("Admins").SendAsync("StatusUpdated", new {
+        var broadcastData = new {
             OrderId = order.Id,
             Status = order.Status,
-            DriverId = driverId
-        });
+            DriverId = driverId,
+            Merchant = new {
+                Name = order.Merchant?.Name,
+                Lat = order.Merchant?.Latitude,
+                Lng = order.Merchant?.Longitude
+            },
+            Customer = new {
+                Lat = order.DeliveryLatitude,
+                Lng = order.DeliveryLongitude
+            }
+        };
+
+        await _hubContext.Clients.Group($"User_{order.CustomerId}").SendAsync("StatusUpdated", broadcastData);
+        await _hubContext.Clients.Group($"Order_{order.Id}").SendAsync("StatusUpdated", broadcastData);
+        await _hubContext.Clients.Group("Admins").SendAsync("StatusUpdated", broadcastData);
 
         return true;
     }
 
     public async Task<bool> UpdateStatusAsync(int orderId, int driverId, string status)
     {
-        var order = await _context.Orders.FindAsync(orderId);
+        var order = await _context.Orders
+            .Include(o => o.Merchant)
+            .FirstOrDefaultAsync(o => o.Id == orderId);
         if (order == null || order.DriverId != driverId) return false;
 
         // Simple state validation for now
@@ -147,15 +159,23 @@ public class OrderService : IOrderService
         order.Status = status;
         await _context.SaveChangesAsync();
 
-        await _hubContext.Clients.Group($"User_{order.CustomerId}").SendAsync("StatusUpdated", new {
+        var broadcastData = new {
             OrderId = order.Id,
-            Status = order.Status
-        });
+            Status = order.Status,
+            Merchant = new {
+                Name = order.Merchant?.Name,
+                Lat = order.Merchant?.Latitude,
+                Lng = order.Merchant?.Longitude
+            },
+            Customer = new {
+                Lat = order.DeliveryLatitude,
+                Lng = order.DeliveryLongitude
+            }
+        };
 
-        await _hubContext.Clients.Group("Admins").SendAsync("StatusUpdated", new {
-            OrderId = order.Id,
-            Status = order.Status
-        });
+        await _hubContext.Clients.Group($"User_{order.CustomerId}").SendAsync("StatusUpdated", broadcastData);
+        await _hubContext.Clients.Group($"Order_{order.Id}").SendAsync("StatusUpdated", broadcastData);
+        await _hubContext.Clients.Group("Admins").SendAsync("StatusUpdated", broadcastData);
 
         return true;
     }

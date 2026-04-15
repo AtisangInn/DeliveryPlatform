@@ -1,237 +1,223 @@
 const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
     ? 'http://localhost:5000/api' 
-    : 'https://deliveryplatform.onrender.com/api'; // Live Render API URL
+    : 'https://deliveryplatform.onrender.com/api';
 
-let authToken = localStorage.getItem('nexus_driver_token');
-let currentOrderId = localStorage.getItem('nexus_active_order');
+// --- STATE ---
+let state = {
+    authToken: localStorage.getItem('nexus_driver_token'),
+    activeJob: JSON.parse(localStorage.getItem('nexus_active_job')),
+    earnings: 0,
+    availableRequests: []
+};
+
 let hubConnection = null;
-let map = null;
+let driverMap = null;
 let driverMarker = null;
 let watchId = null;
 const KAGISO_COORDS = [-26.175, 27.882];
 
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btn = document.getElementById('loginBtn');
-    btn.textContent = 'Authenticating...';
-    
-    try {
-        const response = await fetch(`${API_URL}/Auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                email: document.getElementById('email').value,
-                password: document.getElementById('password').value
-            })
-        });
-
-        if (!response.ok) throw new Error('Invalid credentials');
-        
-        const data = await response.json();
-        if (data.role !== 'Driver') throw new Error('Unauthorized role. Must be a Driver.');
-
-        authToken = data.token;
-        localStorage.setItem('nexus_driver_token', authToken);
-        
-        await initializeApp();
-    } catch (err) {
-        alert(err.message);
-        btn.textContent = 'Go Online';
-    }
-});
-
-function logout() {
-    localStorage.removeItem('nexus_driver_token');
-    window.location.reload();
-}
-
-function switchView(viewName, navContext) {
-    document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
-    document.getElementById(`view-${viewName}`).classList.remove('hidden');
-    
-    if (viewName === 'active') {
-        setTimeout(initMap, 200); // Wait for DOM to be visible
-    }
-
-    if (navContext) {
-        document.querySelectorAll('.nav-btn').forEach(n => n.classList.remove('active'));
-        navContext.classList.add('active');
+// --- INIT ---
+async function init() {
+    setupUI();
+    if (state.authToken) {
+        showApp();
+    } else {
+        switchView('login');
     }
 }
 
-async function initializeApp() {
-    if (!authToken) return;
+function showApp() {
     document.getElementById('view-login').classList.add('hidden');
     document.getElementById('app-content').classList.remove('hidden');
     
-    // Connect WebSockets
-    await connectSignalR();
-    
-    // Load existing active orders (if any)
-    loadAvailableOrders();
-}
-
-function initMap() {
-    if (map) return;
-    
-    map = L.map('map', { zoomControl: false }).setView(KAGISO_COORDS, 15);
-    
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap'
-    }).addTo(map);
-
-    driverMarker = L.marker(KAGISO_COORDS, {
-        icon: L.divIcon({
-            className: 'driver-pin',
-            html: `<div style="background:var(--success); width:24px; height:24px; border-radius:50%; border:2px solid white; box-shadow:0 0 10px var(--primary-glow)"></div>`,
-            iconSize: [24, 24]
-        })
-    }).addTo(map).bindPopup("<b>You (Live)</b>").openPopup();
-
-    startGpsTracking();
-}
-
-function startGpsTracking() {
-    if (!navigator.geolocation) {
-        alert("Geolocation not supported. Tracking disabled.");
-        return;
-    }
-
-    watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-            const { latitude, longitude } = pos.coords;
-            moveDriver(latitude, longitude);
-        },
-        (err) => console.error("GPS Error:", err),
-        { enableHighAccuracy: true }
-    );
-}
-
-async function moveDriver(lat, lng) {
-    if (!driverMarker) return;
-    driverMarker.setLatLng([lat, lng]);
-    if (map) map.panTo([lat, lng]);
-    
-    if (hubConnection && hubConnection.state === signalR.HubConnectionState.Connected && currentOrderId) {
-        await hubConnection.invoke("UpdateDriverLocation", parseInt(currentOrderId), lat, lng);
+    connectHub();
+    if (state.activeJob) {
+        switchView('active', document.querySelectorAll('.nav-btn')[1]);
+    } else {
+        switchView('radar', document.querySelectorAll('.nav-btn')[0]);
+        loadAvailableJobs();
     }
 }
 
-async function connectSignalR() {
-    const hubUrl = API_URL.replace('/api', '/orderhub');
+// --- NETWORK & HUB ---
+async function connectHub() {
+    if (hubConnection) return;
     hubConnection = new signalR.HubConnectionBuilder()
-        .withUrl(hubUrl, {
-            accessTokenFactory: () => authToken
-        })
+        .withUrl(API_URL.replace('/api', '/orderhub'), { accessTokenFactory: () => state.authToken })
         .withAutomaticReconnect()
         .build();
 
-    hubConnection.on("NewOrderAvailable", (orderConfig) => {
-        console.log("INCOMING SIGNALR PING:", orderConfig);
-        renderIncomingOrder(orderConfig);
+    hubConnection.on("NewOrderAvailable", (data) => {
+        state.availableRequests.unshift(data);
+        renderRadar();
     });
 
     try {
         await hubConnection.start();
-        console.log("SignalR Connected! Listening for Orders...");
-    } catch (err) {
-        console.error("SignalR Connection Error: ", err);
+        startGpsTracking();
+    } catch (e) { console.error("Hub failed", e); }
+}
+
+async function loadAvailableJobs() {
+    const orders = await apiGet('Order');
+    state.availableRequests = orders.filter(o => o.status === 'Paid' && !o.driverId).map(o => ({
+        orderId: o.id,
+        merchantName: o.merchant?.name || 'Store',
+        deliveryAddress: o.deliveryAddress,
+        amount: o.totalAmount
+    }));
+    renderRadar();
+}
+
+function startGpsTracking() {
+    if (!navigator.geolocation) return;
+    watchId = navigator.geolocation.watchPosition(pos => {
+        const { latitude, longitude } = pos.coords;
+        pushLocation(latitude, longitude);
+    }, null, { enableHighAccuracy: true });
+}
+
+async function pushLocation(lat, lng) {
+    if (driverMarker) driverMarker.setLatLng([lat, lng]);
+    if (driverMap && state.activeJob) driverMap.panTo([lat, lng]);
+    
+    if (hubConnection && hubConnection.state === "Connected" && state.activeJob) {
+        await hubConnection.invoke("UpdateDriverLocation", state.activeJob.orderId, lat, lng);
     }
 }
 
-function renderIncomingOrder(order) {
-    document.getElementById('radarAnim').classList.remove('active');
-    const container = document.getElementById('availableOrdersList');
-    if(container.innerHTML.includes('Waiting')) container.innerHTML = '';
-
-    const div = document.createElement('div');
-    div.className = 'card';
-    div.id = `order-${order.orderId}`;
-    div.innerHTML = `
-        <h3>${order.merchantName}</h3>
-        <p>Drop-off: ${order.deliveryAddress}</p>
-        <p style="font-weight: 600; color: var(--primary); margin: 0.5rem 0;">Earnings: R20.00</p>
-        <button class="primary" onclick="acceptOrder(${order.orderId}, '${order.merchantName}', '${order.deliveryAddress}', ${order.amount})">Accept Delivery</button>
-    `;
-    container.appendChild(div);
-}
-
-async function loadAvailableOrders() {
+// --- ACTIONS ---
+async function acceptJob(order) {
     try {
-        const response = await fetch(`${API_URL}/Order`, { 
-            headers: { 'Authorization': `Bearer ${authToken}` } 
-        });
-        if (response.ok) {
-            const orders = await response.json();
-            const container = document.getElementById('availableOrdersList');
-            
-            // Only show orders that are 'Paid' and have no driver assigned
-            const available = orders.filter(o => o.status === 'Paid' && !o.driverId);
-            
-            if (available.length > 0) {
-                container.innerHTML = '';
-                document.getElementById('radarAnim').classList.remove('active');
-                available.forEach(o => renderIncomingOrder({
-                    orderId: o.id,
-                    merchantName: o.merchant ? o.merchant.name : 'Unknown Merchant',
-                    deliveryAddress: o.deliveryAddress,
-                    amount: o.totalAmount
-                }));
-            }
-        }
-    } catch (e) { console.warn("Failed to load existing orders:", e); }
-}
-
-async function acceptOrder(id, merchant, address, amount) {
-    // In Milestone 5, we assign the order via API
-    try {
-        const response = await fetch(`${API_URL}/Order/${id}/accept`, {
+        const res = await fetch(`${API_URL}/Order/${order.orderId}/accept`, {
             method: 'PUT',
-            headers: { 'Authorization': `Bearer ${authToken}` }
+            headers: { 'Authorization': `Bearer ${state.authToken}` }
         });
+        if (!res.ok) throw new Error("Job already taken");
         
-        if (!response.ok) throw new Error('Could not accept order.');
-        
-        document.getElementById(`order-${id}`).remove();
-        
-        // Setup Active View
-        currentOrderId = id;
-        localStorage.setItem('nexus_active_order', id);
-        document.getElementById('activeMerchantName').textContent = merchant;
-        document.getElementById('activeAddress').textContent = address;
-        document.getElementById('activeAmount').textContent = `Total Order: R${amount.toFixed(2)}`;
-        
-        document.getElementById('btnPickupOrder').classList.remove('hidden');
-        document.getElementById('btnDeliverOrder').classList.add('hidden');
+        state.activeJob = order;
+        state.activeJob.status = 'Assigned';
+        localStorage.setItem('nexus_active_job', JSON.stringify(state.activeJob));
         
         switchView('active', document.querySelectorAll('.nav-btn')[1]);
-        
-    } catch (err) { alert(err.message); }
+    } catch (e) { alert(e.message); loadAvailableJobs(); }
 }
 
 async function updateOrderStatus(newStatus) {
     try {
-        const response = await fetch(`${API_URL}/Order/${currentOrderId}/status`, {
+        const res = await fetch(`${API_URL}/Order/${state.activeJob.orderId}/status`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.authToken}` },
             body: JSON.stringify({ status: newStatus })
         });
         
-        if (!response.ok) throw new Error('Update failed');
+        if (!res.ok) throw new Error("Update rejected");
         
-        if (newStatus === 'PickedUp') {
-            document.getElementById('btnPickupOrder').classList.add('hidden');
-            document.getElementById('btnDeliverOrder').classList.remove('hidden');
-        } else if (newStatus === 'Delivered') {
-            alert('Delivery Complete! R20.00 added to your earnings.');
-            currentOrderId = null;
-            localStorage.removeItem('nexus_active_order');
-            switchView('home', document.querySelectorAll('.nav-btn')[0]);
-            document.getElementById('radarAnim').classList.add('active');
+        if (newStatus === 'Delivered') {
+            alert("Delivery Successful! Payout credited.");
+            state.earnings += 20;
+            state.activeJob = null;
+            localStorage.removeItem('nexus_active_job');
+            document.getElementById('earnedToday').textContent = `R${state.earnings.toFixed(2)}`;
+            switchView('radar', document.querySelectorAll('.nav-btn')[0]);
+        } else {
+            state.activeJob.status = newStatus;
+            renderActiveJob();
         }
-        
-    } catch(err) { alert(err.message); }
+    } catch (e) { alert(e.message); }
 }
 
-// Auto-login check
-if (authToken) { initializeApp(); }
+// --- NAVIGATION & RENDERING ---
+function switchView(viewId, navBtn) {
+    document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+    document.getElementById(`view-${viewId}`).classList.remove('hidden');
+
+    if (navBtn) {
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        navBtn.classList.add('active');
+    }
+
+    if (viewId === 'active') initActiveMap();
+}
+
+function renderRadar() {
+    const list = document.getElementById('availableOrdersList');
+    if (state.availableRequests.length === 0) {
+        list.innerHTML = '';
+        return;
+    }
+    
+    list.innerHTML = state.availableRequests.map(r => `
+        <div class="request-card">
+            <h3>${r.merchantName}</h3>
+            <p>To: ${r.deliveryAddress}</p>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:700; color:var(--secondary)">R20.00 Earning</span>
+                <button class="secondary-btn" style="width:auto; padding:0.5rem 1rem;" 
+                    onclick='acceptJob(${JSON.stringify(r)})'>ACCEPT</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function initActiveMap() {
+    if (!state.activeJob) return;
+    if (!driverMap) {
+        driverMap = L.map('driverMap', { zoomControl: false }).setView(KAGISO_COORDS, 15);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(driverMap);
+        driverMarker = L.marker(KAGISO_COORDS, {
+            icon: L.divIcon({ className: 'nexus-pin pin-driver', html: '🏍️', iconSize: [36,36] })
+        }).addTo(driverMap);
+    }
+    renderActiveJob();
+}
+
+function renderActiveJob() {
+    const j = state.activeJob;
+    document.getElementById('activeMerchantName').textContent = j.merchantName;
+    document.getElementById('activeAddress').textContent = j.deliveryAddress;
+    document.getElementById('activeAmount').textContent = `R${j.amount.toFixed(2)}`;
+
+    const pickupBtn = document.getElementById('btnPickupOrder');
+    const deliverBtn = document.getElementById('btnDeliverOrder');
+
+    if (j.status === 'Assigned' || j.status === 'Preparing') {
+        pickupBtn.classList.remove('hidden');
+        deliverBtn.classList.add('hidden');
+    } else if (j.status === 'PickedUp' || j.status === 'OutForDelivery') {
+        pickupBtn.classList.add('hidden');
+        deliverBtn.classList.remove('hidden');
+    }
+}
+
+// --- UTILS ---
+async function apiGet(endpoint) {
+    const res = await fetch(`${API_URL}/${endpoint}`, { headers: { 'Authorization': `Bearer ${state.authToken}` } });
+    if(res.status === 401) logout();
+    return await res.json();
+}
+
+function setupUI() {
+    document.getElementById('loginForm').addEventListener('submit', handleLogin);
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    const btn = document.getElementById('loginBtn');
+    btn.textContent = 'CONNECTING...';
+    try {
+        const res = await fetch(`${API_URL}/Auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: document.getElementById('email').value, password: document.getElementById('password').value })
+        });
+        const data = await res.json();
+        state.authToken = data.token;
+        localStorage.setItem('nexus_driver_token', data.token);
+        showApp();
+    } catch (e) { alert("Access Denied"); btn.textContent = "Initiate Shift"; }
+}
+
+function logout() { localStorage.clear(); location.reload(); }
+
+init();
