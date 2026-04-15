@@ -1,4 +1,7 @@
-const API_URL = 'http://localhost:5000/api';
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'http://localhost:5000/api' 
+    : 'https://delivery-platform-api.onrender.com/api'; // Replace with your actual Render URL
+
 let authToken = localStorage.getItem('nexus_cust_token');
 let userName = localStorage.getItem('nexus_cust_name');
 let hubConnection = null;
@@ -48,8 +51,10 @@ function init() {
 async function connectSignalR() {
     if (!authToken) return;
     
+    const hubUrl = API_URL.replace('/api', '/orderhub');
+    
     hubConnection = new signalR.HubConnectionBuilder()
-        .withUrl("http://localhost:5000/orderhub", {
+        .withUrl(hubUrl, {
             accessTokenFactory: () => authToken
         })
         .withAutomaticReconnect()

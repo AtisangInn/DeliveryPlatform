@@ -1,4 +1,7 @@
-const API_URL = 'http://localhost:5000/api';
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'http://localhost:5000/api' 
+    : 'https://delivery-platform-api.onrender.com/api'; // Replace with your actual Render URL
+
 let authToken = localStorage.getItem('nexus_token');
 let adminName = localStorage.getItem('nexus_admin');
 
