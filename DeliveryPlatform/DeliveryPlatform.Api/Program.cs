@@ -9,7 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -54,10 +54,9 @@ builder.Services.AddScoped<DeliveryPlatform.Api.Services.Interfaces.IOrderServic
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll",
-        b => b.WithOrigins("http://127.0.0.1:5500", "http://localhost:5500")
+        b => b.AllowAnyOrigin()
               .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials());
+              .AllowAnyHeader());
 });
 
 var app = builder.Build();
