@@ -8,7 +8,7 @@ public static class DbInitializer
 {
     public static async Task Seed(ApplicationDbContext context)
     {
-        await context.Database.EnsureCreatedAsync();
+        await context.Database.MigrateAsync();
 
         if (await context.Users.AnyAsync()) return; // Already seeded
 
