@@ -72,9 +72,13 @@ public class OrderService : IOrderService
         var pfMerchantKey = _config["PayFast:MerchantKey"];
         var pfUrl = _config["PayFast:Url"];
         
-        var returnUrl = $"http://localhost:5000/api/Payment/success?orderId={order.Id}"; 
-        var cancelUrl = "http://localhost:5000/api/Payment/cancel";
-        var notifyUrl = "http://bc45-local-testing.ngrok.io/api/Payment/itn"; 
+        var frontendUrl = _config["Deployment:FrontendUrl"]?.TrimEnd('/');
+        var backendUrl = _config["Deployment:BackendUrl"]?.TrimEnd('/');
+
+        // Correct URLs for production
+        var returnUrl = $"{backendUrl}/api/Payment/success?orderId={order.Id}"; 
+        var cancelUrl = $"{backendUrl}/api/Payment/cancel";
+        var notifyUrl = $"{backendUrl}/api/Payment/itn"; 
 
         var htmlForm = $@"
             <form id='payfast-form' action='{pfUrl}' method='post'>

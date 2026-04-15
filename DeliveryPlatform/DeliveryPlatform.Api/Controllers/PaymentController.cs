@@ -11,11 +11,13 @@ public class PaymentController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly Microsoft.AspNetCore.SignalR.IHubContext<Hubs.OrderHub> _hubContext;
+    private readonly IConfiguration _config;
 
-    public PaymentController(ApplicationDbContext context, Microsoft.AspNetCore.SignalR.IHubContext<Hubs.OrderHub> hubContext)
+    public PaymentController(ApplicationDbContext context, Microsoft.AspNetCore.SignalR.IHubContext<Hubs.OrderHub> hubContext, IConfiguration config)
     {
         _context = context;
         _hubContext = hubContext;
+        _config = config;
     }
 
     // This is explicitly unsecured so outside requests (PayFast server) can hit it
@@ -72,46 +74,59 @@ public class PaymentController : ControllerBase
     [HttpGet("success")]
     public IActionResult ReturnSuccess([FromQuery] string orderId)
     {
+        var frontendUrl = _config["Deployment:FrontendUrl"]?.TrimEnd('/') ?? "http://localhost:5500";
+        var isLocal = frontendUrl.Contains("localhost") || frontendUrl.Contains("127.0.0.1");
+
         return Content($@"
             <html>
             <body style='font-family:sans-serif; text-align:center; padding:50px; background:#10B981; color:white;'>
                 <h1>Payment Successful!</h1>
-                <p>Order #{orderId} has been authorized by the sandbox.</p>
+                <p>Order #{orderId} has been authorized.</p>
                 
+                {(isLocal ? $@"
                 <div style='margin-top:20px; padding:20px; background:rgba(0,0,0,0.1); border-radius:10px; display:inline-block;'>
-                    <p style='font-size:0.9rem;'><b>LOCAL DEV ONLY:</b> Since PayFast cannot reach your 'localhost' directly without a public tunnel (ngrok), click the button below to manually trigger the 'Paid' status and alert the Driver App.</p>
+                    <p style='font-size:0.9rem;'><b>LOCAL DEV ONLY:</b> Since PayFast cannot reach your 'localhost' directly, click below to manually trigger the 'Paid' status.</p>
                     <button id='simBtn' style='padding:12px 24px; font-weight:600; cursor:pointer; border:none; border-radius:8px; background:white; color:#10B981;'>Process Order Status & Alert Drivers</button>
+                </div>" : $@"
+                <p>Your order is being processed. You will be redirected shortly.</p>
+                <script>setTimeout(() => {{ window.location.href = '{frontendUrl}/index.html'; }}, 3000);</script>
+                ")}
+
+                <div style='margin-top:30px;'>
+                    <a href='{frontendUrl}/index.html' style='color:white; text-decoration:underline;'>Return to Application</a>
                 </div>
 
                 <script>
-                    document.getElementById('simBtn').onclick = async () => {{
-                        const btn = document.getElementById('simBtn');
-                        btn.textContent = 'Processing...';
-                        try {{
-                            const body = new URLSearchParams();
-                            body.append('payment_status', 'COMPLETE');
-                            body.append('m_payment_id', '{orderId}');
-                            body.append('pf_payment_id', 'sim_manual_trigger');
-                            
-                            const res = await fetch('/api/Payment/itn', {{
-                                method: 'POST',
-                                headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }},
-                                body: body
-                            }});
-                            
-                            if(res.ok) {{
-                                btn.textContent = 'Done! Drivers Notified.';
-                                btn.style.background = '#d1fae5';
-                                alert('Success! Status updated and SignalR broadcast sent to drivers. Returning you to the app...');
-                                window.location.href = 'http://127.0.0.1:5500/index.html';
-                            }} else {{
-                                throw new Error('Failed to trigger update');
+                    if (document.getElementById('simBtn')) {{
+                        document.getElementById('simBtn').onclick = async () => {{
+                            const btn = document.getElementById('simBtn');
+                            btn.textContent = 'Processing...';
+                            try {{
+                                const body = new URLSearchParams();
+                                body.append('payment_status', 'COMPLETE');
+                                body.append('m_payment_id', '{orderId}');
+                                body.append('pf_payment_id', 'sim_manual_trigger');
+                                
+                                const res = await fetch('/api/Payment/itn', {{
+                                    method: 'POST',
+                                    headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }},
+                                    body: body
+                                }});
+                                
+                                if(res.ok) {{
+                                    btn.textContent = 'Done! Drivers Notified.';
+                                    btn.style.background = '#d1fae5';
+                                    alert('Success! Status updated. Returning you to the app...');
+                                    window.location.href = '{frontendUrl}/index.html';
+                                }} else {{
+                                    throw new Error('Failed to trigger update');
+                                }}
+                            }} catch(e) {{
+                                alert(e.message);
+                                btn.textContent = 'Retry';
                             }}
-                        }} catch(e) {{
-                            alert(e.message);
-                            btn.textContent = 'Retry';
-                        }}
-                    }};
+                        }};
+                    }}
                 </script>
             </body>
             </html>", "text/html");
