@@ -4,6 +4,10 @@ const API_URL = window.location.hostname === 'localhost' || window.location.host
 
 let authToken = localStorage.getItem('nexus_token');
 let adminName = localStorage.getItem('nexus_admin');
+let hubConnection = null;
+let adminMap = null;
+let driverMarkers = {};
+let merchantMarkers = {};
 
 // DOM Elements
 const loginView = document.getElementById('loginView');
@@ -55,6 +59,8 @@ function showApp() {
     appView.classList.remove('hidden');
     document.getElementById('adminNameDisplay').textContent = adminName || 'System Admin';
     loadDashboardStats();
+    initAdminMap();
+    initHub();
 }
 
 // Auth
@@ -114,7 +120,82 @@ async function loadDashboardStats() {
     try {
         const merchants = await apiGet('Merchant');
         document.getElementById('statMerchants').textContent = merchants.length;
+        
+        // Add merchants to map
+        merchants.forEach(m => {
+            if (!merchantMarkers[m.id]) {
+                const marker = L.marker([-26.175, 27.882], { // Mock coord for Kagiso if not in DB
+                    icon: L.divIcon({
+                        className: 'merchant-pin',
+                        html: `<div style="background:var(--primary); width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; border:2px solid white; box-shadow:0 0 10px rgba(0,0,0,0.5)">🏪</div>`,
+                        iconSize: [30, 30]
+                    })
+                }).addTo(adminMap).bindPopup(`<b>${m.name}</b><br>${m.address}`);
+                merchantMarkers[m.id] = marker;
+            }
+        });
     } catch (e) { console.error('Data pull failed', e); }
+}
+
+function initAdminMap() {
+    if (adminMap) return;
+    adminMap = L.map('adminMap', { zoomControl: false }).setView([-26.175, 27.882], 13);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(adminMap);
+}
+
+async function initHub() {
+    if (hubConnection) return;
+    
+    hubConnection = new signalR.HubConnectionBuilder()
+        .withUrl(API_URL.replace('/api', '/orderHub'), {
+            accessTokenFactory: () => authToken
+        })
+        .withAutomaticReconnect()
+        .build();
+
+    hubConnection.on("DriverLocationUpdated", (data) => {
+        logEvent(`Driver location updated for Order #${data.orderId}`);
+        updateDriverOnMap(data);
+    });
+
+    hubConnection.on("StatusUpdated", (data) => {
+        logEvent(`Order #${data.orderId} status changed to: <b>${data.status}</b>`);
+        loadDashboardStats(); // Refresh stats
+    });
+
+    try {
+        await hubConnection.start();
+        logEvent("Secure telemetry link established.");
+    } catch (err) {
+        console.error("Hub connection failed", err);
+    }
+}
+
+function updateDriverOnMap(data) {
+    const { orderId, lat, lng } = data;
+    if (!driverMarkers[orderId]) {
+        driverMarkers[orderId] = L.marker([lat, lng], {
+            icon: L.divIcon({
+                className: 'driver-pin',
+                html: `<div style="background:#10b981; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; border:2px solid white; box-shadow:0 0 10px var(--primary-glow)">🏍️</div>`,
+                iconSize: [30, 30]
+            })
+        }).addTo(adminMap).bindPopup(`Driver for Order #${orderId}`);
+    } else {
+        driverMarkers[orderId].setLatLng([lat, lng]);
+    }
+    adminMap.panTo([lat, lng]);
+}
+
+function logEvent(msg) {
+    const feed = document.getElementById('liveFeed');
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const item = document.createElement('div');
+    item.className = 'feed-item';
+    item.innerHTML = `<span class="feed-time">[${time}]</span> ${msg}`;
+    feed.prepend(item);
 }
 
 async function loadMerchants() {

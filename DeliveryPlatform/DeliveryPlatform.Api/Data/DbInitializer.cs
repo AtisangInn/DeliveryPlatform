@@ -60,22 +60,24 @@ public static class DbInitializer
         // 3. Seed Merchants
         if (!await context.Merchants.AnyAsync())
         {
-            Name = "Kagiso Grill & Burger",
-            Category = "Fast Food",
-            Address = "12 Main St, Kagiso",
-            IsActive = true,
-            CommissionPercentage = 15.00m
-        };
-        context.Merchants.Add(merchant);
-        await context.SaveChangesAsync();
+            var merchant = new Merchant
+            {
+                Name = "Kagiso Grill & Burger",
+                Category = "Fast Food",
+                Address = "12 Main St, Kagiso",
+                IsActive = true,
+                CommissionPercentage = 15.00m
+            };
+            context.Merchants.Add(merchant);
+            await context.SaveChangesAsync();
 
-        // 4. Seed Menu Items
-        context.MenuItems.AddRange(
-            new MenuItem { MerchantId = merchant.Id, Name = "Classic Beef Burger", Price = 85.00m, Description = "Flame grilled beef patty with cheese", IsAvailable = true },
-            new MenuItem { MerchantId = merchant.Id, Name = "Large Fries", Price = 35.00m, Description = "Golden crispy fries", IsAvailable = true },
-            new MenuItem { MerchantId = merchant.Id, Name = "Coke 330ml", Price = 20.00m, Description = "Ice cold refreshment", IsAvailable = true }
-        );
-
-        await context.SaveChangesAsync();
+            // 4. Seed Menu Items
+            context.MenuItems.AddRange(
+                new MenuItem { MerchantId = merchant.Id, Name = "Classic Beef Burger", Price = 85.00m, Description = "Flame grilled beef patty with cheese", IsAvailable = true },
+                new MenuItem { MerchantId = merchant.Id, Name = "Large Fries", Price = 35.00m, Description = "Golden crispy fries", IsAvailable = true },
+                new MenuItem { MerchantId = merchant.Id, Name = "Coke 330ml", Price = 20.00m, Description = "Ice cold refreshment", IsAvailable = true }
+            );
+            await context.SaveChangesAsync();
+        }
     }
 }

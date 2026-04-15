@@ -17,6 +17,11 @@ public class OrderHub : Hub
             await Groups.AddToGroupAsync(Context.ConnectionId, "Drivers");
         }
         
+        if (role == "Admin")
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, "Admins");
+        }
+        
         if (!string.IsNullOrEmpty(userId))
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, $"User_{userId}");
@@ -42,6 +47,8 @@ public class OrderHub : Hub
         // Let's assume the client knows the customerId to target, or we fetch it
         // Simpler for this demo: broadcast to everyone, and clients filter by orderId
         // Or better: Broadcast to "Order_{orderId}" group
+        // Broadcast to the Admins group (for command center) and others (for the specific customer)
+        await Clients.Group("Admins").SendAsync("DriverLocationUpdated", new { OrderId = orderId, Lat = lat, Lng = lng });
         await Clients.Others.SendAsync("DriverLocationUpdated", new { OrderId = orderId, Lat = lat, Lng = lng });
     }
 }

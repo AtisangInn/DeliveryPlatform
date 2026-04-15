@@ -3,11 +3,12 @@ const API_URL = window.location.hostname === 'localhost' || window.location.host
     : 'https://deliveryplatform.onrender.com/api'; // Live Render API URL
 
 let authToken = localStorage.getItem('nexus_driver_token');
+let currentOrderId = localStorage.getItem('nexus_active_order');
 let hubConnection = null;
-let currentOrderId = null;
 let map = null;
 let driverMarker = null;
-const KAGISO_COORDS = [-26.17, 27.78];
+let watchId = null;
+const KAGISO_COORDS = [-26.175, 27.882];
 
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -73,36 +74,46 @@ async function initializeApp() {
 function initMap() {
     if (map) return;
     
-    map = L.map('map').setView(KAGISO_COORDS, 14);
+    map = L.map('map', { zoomControl: false }).setView(KAGISO_COORDS, 15);
     
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
-    // Initial Marker
     driverMarker = L.marker(KAGISO_COORDS, {
-        draggable: false,
-        title: "Your Location"
-    }).addTo(map)
-      .bindPopup("<b>You</b><br>Click map to simulate moving.")
-      .openPopup();
+        icon: L.divIcon({
+            className: 'driver-pin',
+            html: `<div style="background:var(--success); width:24px; height:24px; border-radius:50%; border:2px solid white; box-shadow:0 0 10px var(--primary-glow)"></div>`,
+            iconSize: [24, 24]
+        })
+    }).addTo(map).bindPopup("<b>You (Live)</b>").openPopup();
 
-    // -- SIMULATION MODE --
-    // When the map is clicked, move the driver icon and tell the backend
-    map.on('click', (e) => {
-        const { lat, lng } = e.latlng;
-        moveDriver(lat, lng);
-    });
+    startGpsTracking();
+}
+
+function startGpsTracking() {
+    if (!navigator.geolocation) {
+        alert("Geolocation not supported. Tracking disabled.");
+        return;
+    }
+
+    watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+            const { latitude, longitude } = pos.coords;
+            moveDriver(latitude, longitude);
+        },
+        (err) => console.error("GPS Error:", err),
+        { enableHighAccuracy: true }
+    );
 }
 
 async function moveDriver(lat, lng) {
     if (!driverMarker) return;
     driverMarker.setLatLng([lat, lng]);
+    if (map) map.panTo([lat, lng]);
     
-    // Send to SignalR
     if (hubConnection && hubConnection.state === signalR.HubConnectionState.Connected && currentOrderId) {
-        console.log("Pushing Location Tracking:", { lat, lng });
-        await hubConnection.invoke("UpdateDriverLocation", currentOrderId, lat, lng);
+        await hubConnection.invoke("UpdateDriverLocation", parseInt(currentOrderId), lat, lng);
     }
 }
 
@@ -185,6 +196,7 @@ async function acceptOrder(id, merchant, address, amount) {
         
         // Setup Active View
         currentOrderId = id;
+        localStorage.setItem('nexus_active_order', id);
         document.getElementById('activeMerchantName').textContent = merchant;
         document.getElementById('activeAddress').textContent = address;
         document.getElementById('activeAmount').textContent = `Total Order: R${amount.toFixed(2)}`;
@@ -213,6 +225,7 @@ async function updateOrderStatus(newStatus) {
         } else if (newStatus === 'Delivered') {
             alert('Delivery Complete! R20.00 added to your earnings.');
             currentOrderId = null;
+            localStorage.removeItem('nexus_active_order');
             switchView('home', document.querySelectorAll('.nav-btn')[0]);
             document.getElementById('radarAnim').classList.add('active');
         }

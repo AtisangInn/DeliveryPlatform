@@ -5,10 +5,9 @@ const API_URL = window.location.hostname === 'localhost' || window.location.host
 let authToken = localStorage.getItem('nexus_cust_token');
 let userName = localStorage.getItem('nexus_cust_name');
 let hubConnection = null;
-let customerMap = null;
-let driverMarker = null;
-let storeMarker = null;
-const KAGISO_COORDS = [-26.17, 27.78];
+let merchantMarkers = {};
+let driverMarkers = {};
+const KAGISO_COORDS = [-26.175, 27.882];
 
 // Cart State
 let cart = []; // Array of { id, name, price, qty }
@@ -62,14 +61,12 @@ async function connectSignalR() {
 
     hubConnection.on("StatusUpdated", (data) => {
         console.log("Order Status Update:", data);
-        // If we are currently on the orders view, reload them
         const ordersView = document.getElementById('view-orders');
         if (!ordersView.classList.contains('hidden')) {
             loadOrders();
         }
-        
-        // Push notification simulation
-        alert(`Order #${data.orderId} updated to: ${data.status}`);
+        // Custom premium toast instead of alert (simulated for now)
+        console.log(`Notification: Order #${data.orderId} is now ${data.status}`);
     });
 
     hubConnection.on("DriverLocationUpdated", (data) => {
@@ -217,34 +214,37 @@ function renderOrders(orders) {
 }
 
 function initTrackingMap(order) {
-    if (customerMap) return; // Only init once
+    if (customerMap) return;
     
-    customerMap = L.map('customer-map').setView(KAGISO_COORDS, 14);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(customerMap);
+    customerMap = L.map('customer-map', { zoomControl: false }).setView(KAGISO_COORDS, 15);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(customerMap);
 
     // 1. Store Marker
-    storeMarker = L.marker([KAGISO_COORDS[0] + 0.005, KAGISO_COORDS[1] + 0.005], {
-        icon: L.icon({
-            iconUrl: 'https://cdn-icons-png.flaticon.com/512/610/610365.png',
+    L.marker([-26.175, 27.882], {
+        icon: L.divIcon({
+            className: 'store-pin',
+            html: `<div style="background:var(--primary); width:32px; height:32px; border-radius:50%; border:2px solid white; display:flex; align-items:center; justify-content:center; color:white;">🏪</div>`,
             iconSize: [32, 32]
         })
     }).addTo(customerMap).bindPopup("<b>Merchant</b><br>Preparing your order...");
 
     // 2. Delivery Marker (Home)
     L.marker(KAGISO_COORDS, {
-        icon: L.icon({
-            iconUrl: 'https://cdn-icons-png.flaticon.com/512/25/25694.png',
+        icon: L.divIcon({
+            className: 'home-pin',
+            html: `<div style="background:#111; width:32px; height:32px; border-radius:50%; border:2px solid white; display:flex; align-items:center; justify-content:center; color:white;">🏠</div>`,
             iconSize: [32, 32]
         })
     }).addTo(customerMap).bindPopup("<b>Your Home</b>");
 
     // 3. Driver Marker
-    driverMarker = L.marker([KAGISO_COORDS[0] - 0.01, KAGISO_COORDS[1] - 0.01], {
-        icon: L.icon({
-            iconUrl: 'https://cdn-icons-png.flaticon.com/512/2964/2964514.png',
-            iconSize: [40, 40]
+    driverMarker = L.marker([-26.18, 27.88], {
+        icon: L.divIcon({
+            className: 'driver-pin',
+            html: `<div style="background:var(--success); width:36px; height:36px; border-radius:50%; border:2px solid white; display:flex; align-items:center; justify-content:center; color:white; box-shadow:0 0 15px var(--primary-glow)">🏍️</div>`,
+            iconSize: [36, 36]
         })
-    }).addTo(customerMap).bindPopup("<b>Driver</b><br>Moving to location...");
+    }).addTo(customerMap).bindPopup("<b>Driver</b><br>En route...");
 }
 
 function updateDriverMarker(lat, lng) {

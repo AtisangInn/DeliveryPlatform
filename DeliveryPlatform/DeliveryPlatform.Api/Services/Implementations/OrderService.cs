@@ -126,6 +126,12 @@ public class OrderService : IOrderService
             Status = order.Status
         });
 
+        await _hubContext.Clients.Group("Admins").SendAsync("StatusUpdated", new {
+            OrderId = order.Id,
+            Status = order.Status,
+            DriverId = driverId
+        });
+
         return true;
     }
 
@@ -142,6 +148,11 @@ public class OrderService : IOrderService
         await _context.SaveChangesAsync();
 
         await _hubContext.Clients.Group($"User_{order.CustomerId}").SendAsync("StatusUpdated", new {
+            OrderId = order.Id,
+            Status = order.Status
+        });
+
+        await _hubContext.Clients.Group("Admins").SendAsync("StatusUpdated", new {
             OrderId = order.Id,
             Status = order.Status
         });

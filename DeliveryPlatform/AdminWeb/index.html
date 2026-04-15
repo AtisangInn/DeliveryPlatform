@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nexus Delivery - Admin Command</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
 
@@ -81,7 +82,7 @@
                 <div class="stat-grid">
                     <div class="stat-card">
                         <p>Total Processed Revenue</p>
-                        <div class="stat-value">R0.00</div>
+                        <div class="stat-value" id="statRevenue">R0.00</div>
                     </div>
                     <div class="stat-card">
                         <p>Active Merchants</p>
@@ -89,7 +90,17 @@
                     </div>
                     <div class="stat-card">
                         <p>Live Orders</p>
-                        <div class="stat-value">0</div>
+                        <div class="stat-value" id="statOrders">0</div>
+                    </div>
+                </div>
+
+                <div class="map-container" style="height: 400px; border-radius: 12px; border: 1px solid var(--border-color); overflow: hidden; position: relative;">
+                    <div id="adminMap" style="height: 100%; width: 100%;"></div>
+                    <div class="map-overlay">
+                        <h3>COMMAND CENTER: LIVE FEED</h3>
+                        <div id="liveFeed" style="max-height: 100px; overflow-y: auto; font-size: 0.75rem; color: var(--text-secondary);">
+                            Waiting for platform activity...
+                        </div>
                     </div>
                 </div>
             </div>
@@ -158,6 +169,8 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
