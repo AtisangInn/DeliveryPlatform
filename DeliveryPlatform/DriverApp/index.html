@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Nexus Driver</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+
+<div class="mobile-app">
+
+    <!-- Login View -->
+    <div id="view-login" class="view" style="justify-content: center;">
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <div style="width: 80px; height: 80px; background: var(--primary); border-radius: 24px; margin: 0 auto 1.5rem auto; display: flex; align-items: center; justify-content: center; color: white;">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+            <h1>Driver Portal</h1>
+            <p>Sign in to start delivering.</p>
+        </div>
+
+        <form id="loginForm">
+            <input type="email" id="email" placeholder="driver@deliverlocal.com" value="driver@deliverlocal.com" required>
+            <input type="password" id="password" placeholder="Password" value="password" required>
+            <button type="submit" class="primary" id="loginBtn">Go Online</button>
+        </form>
+    </div>
+
+    <!-- Main App Wrapper -->
+    <div id="app-content" class="hidden" style="height: 100%; display: flex; flex-direction: column;">
+        
+        <header style="padding: 1.5rem; background: var(--bg-card); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border);">
+            <div>
+                <p style="font-size: 0.8rem; margin: 0; color: var(--success); font-weight: 600;">STATUS: ONLINE</p>
+                <h2 style="font-size: 1.1rem; margin-top: 0.2rem;">Searching for Orders...</h2>
+            </div>
+        </header>
+
+        <!-- Home View -->
+        <div id="view-home" class="view">
+            
+            <div class="radar active" id="radarAnim"></div>
+            
+            <h2 style="margin-top: 1rem; font-size: 1.1rem;">Available Orders</h2>
+            <div id="availableOrdersList">
+                <p style="text-align: center; margin-top: 2rem;">Waiting for new requests...</p>
+                <!-- SignalR injects orders here -->
+            </div>
+        </div>
+
+        <!-- Active Order View -->
+        <div id="view-active" class="view hidden">
+            <h1>Current Delivery</h1>
+            <div id="map" style="height: 300px; width: 100%; border-radius: 12px; margin-bottom: 1rem; border: 1px solid var(--border);"></div>
+            <p style="font-size: 0.7rem; color: var(--text-muted); text-align: center; margin-bottom: 0.5rem;">[SIMULATION] Click anywhere on map to move the driver icon.</p>
+            
+            <div class="card" id="activeOrderCard">
+                <h3 id="activeMerchantName">Loading...</h3>
+                <p id="activeAddress">...</p>
+                <p style="font-weight: 600; font-size: 1.2rem; color: var(--primary); margin: 0.5rem 0;" id="activeAmount"></p>
+                
+                <button class="primary" id="btnPickupOrder" onclick="updateOrderStatus('PickedUp')" style="margin-top: 1rem;">Confirm Pickup</button>
+                <button class="primary success hidden" id="btnDeliverOrder" onclick="updateOrderStatus('Delivered')" style="margin-top: 1rem;">Complete Delivery</button>
+            </div>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <div class="nav-btn active" onclick="switchView('home', this)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Requests
+            </div>
+            <div class="nav-btn" onclick="switchView('active', this)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                Map
+            </div>
+            <div class="nav-btn" onclick="logout()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+                Offline
+            </div>
+        </nav>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
