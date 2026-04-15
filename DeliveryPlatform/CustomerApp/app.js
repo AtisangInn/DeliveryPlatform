@@ -117,11 +117,13 @@ async function openMerchant(id) {
     document.getElementById('menuMerchantName').textContent = m.name;
     document.getElementById('menuMerchantCategory').textContent = m.category;
     
-    // Simulate/Fetch Menu
-    const menuItems = m.menuItems?.length ? m.menuItems : [
-        { id: 101, name: 'Nexus Burger', description: 'Double beef, secret sauce', price: 95 },
-        { id: 102, name: 'Fries', description: 'Large cut, sea salt', price: 35 }
-    ];
+    // Fetch Menu (Ensure real IDs from DB are used)
+    const menuItems = m.menuItems || [];
+
+    if (menuItems.length === 0) {
+        document.getElementById('menuItemsList').innerHTML = `<p style="padding:2rem; text-align:center; color:var(--text-secondary)">No items available yet.</p>`;
+        return;
+    }
 
     document.getElementById('menuItemsList').innerHTML = menuItems.map(item => `
         <div class="menu-item">
@@ -225,12 +227,19 @@ function renderCart() {
 
 async function processCheckout() {
     const btn = document.getElementById('checkoutBtn');
+    const originalText = btn.textContent;
     btn.textContent = 'INITIATING SECURE PAYMENT...';
+    btn.disabled = true;
     
     const payload = {
         merchantId: state.selectedMerchant.id,
         deliveryAddress: "123 Sandton Dr, Kagiso",
-        items: state.cart.map(i => ({ menuItemId: i.id, quantity: i.qty }))
+        items: state.cart.map(i => ({ 
+            menuItemId: i.id, 
+            name: i.name,
+            quantity: i.qty,
+            price: i.price
+        }))
     };
 
     try {
@@ -239,9 +248,21 @@ async function processCheckout() {
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.authToken}` },
             body: JSON.stringify(payload)
         });
+        
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || "Checkout failed at gateway");
+        }
+
         const data = await res.json();
-        document.open(); document.write(data.paymentHtmlForm); document.close();
-    } catch (e) { alert("Checkout failed"); }
+        document.open(); 
+        document.write(data.paymentHtmlForm); 
+        document.close();
+    } catch (e) { 
+        alert(`Checkout Error: ${e.message}`); 
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
 }
 
 // --- CORE UTILS ---
