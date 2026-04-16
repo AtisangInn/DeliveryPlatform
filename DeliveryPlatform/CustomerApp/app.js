@@ -52,7 +52,18 @@ function showApp() {
     document.getElementById('appShell').classList.remove('hidden');
 
     if (state.deliveryAddress) {
-        document.getElementById('headerAddress').textContent = state.deliveryAddress;
+        document.getElementById('headerAddress').textContent = state.deliveryAddress.split(',')[0];
+    } else if (navigator.geolocation) {
+        // Auto-fetch location if missing
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
+                const data = await res.json();
+                if (data && data.display_name) {
+                    selectAddress(data.display_name, pos.coords.latitude, pos.coords.longitude);
+                }
+            } catch (e) { console.error('Auto-location error:', e); }
+        }, () => {}, { timeout: 10000 });
     }
 
     document.getElementById('addressPickerBtn').addEventListener('click', openAddressModal);
@@ -436,8 +447,9 @@ function searchAddress(query) {
     }
     addressTimer = setTimeout(async () => {
         try {
+            const searchQuery = encodeURIComponent(query + (query.toLowerCase().includes('south africa') ? '' : ', South Africa'));
             const res = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Kagiso, South Africa')}&limit=5&addressdetails=1`,
+                `https://nominatim.openstreetmap.org/search?format=json&q=${searchQuery}&limit=5&addressdetails=1`,
                 { headers: { 'Accept-Language': 'en' } }
             );
             const data = await res.json();
@@ -493,8 +505,9 @@ function searchAddressModal(query) {
     }
     addressTimer = setTimeout(async () => {
         try {
+            const searchQuery = encodeURIComponent(query + (query.toLowerCase().includes('south africa') ? '' : ', South Africa'));
             const res = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Kagiso, South Africa')}&limit=5&addressdetails=1`,
+                `https://nominatim.openstreetmap.org/search?format=json&q=${searchQuery}&limit=5&addressdetails=1`,
                 { headers: { 'Accept-Language': 'en' } }
             );
             const data = await res.json();

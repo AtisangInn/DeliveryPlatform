@@ -595,12 +595,13 @@ a { color: var(--accent); text-decoration: none; }
 #viewTracking.active-view { display: flex; }
 
 .tracking-map-container {
-    flex: 1;
+    flex: 2;
     position: relative;
-    min-height: 200px;
+    min-height: 350px;
+    width: 100%;
 }
 
-.tracking-map { height: 100%; width: 100%; }
+.tracking-map { position: absolute; inset: 0; width: 100%; height: 100%; }
 
 .tracking-panel {
     background: var(--white);
