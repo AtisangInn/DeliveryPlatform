@@ -47,7 +47,7 @@ public class OrderService : IOrderService
             });
         }
 
-        decimal deliveryFee = 20.00m;
+        decimal deliveryFee = 35.00m;
         decimal totalAmount = subtotal + deliveryFee;
 
         // 2. Save Order
@@ -57,8 +57,8 @@ public class OrderService : IOrderService
             MerchantId = request.MerchantId,
             TotalAmount = totalAmount,
             DeliveryAddress = request.DeliveryAddress,
-            DeliveryLatitude = -26.17, // Kagiso simulation
-            DeliveryLongitude = 27.78,
+            DeliveryLatitude = request.DeliveryLatitude,
+            DeliveryLongitude = request.DeliveryLongitude,
             Status = "PendingPayment",
             CreatedAt = DateTime.UtcNow,
             OrderItems = orderItems
@@ -104,7 +104,11 @@ public class OrderService : IOrderService
 
     public async Task<List<Order>> GetOrdersAsync(int userId, string role)
     {
-        IQueryable<Order> query = _context.Orders.Include(o => o.Merchant);
+        IQueryable<Order> query = _context.Orders
+            .Include(o => o.Merchant)
+            .Include(o => o.Customer)
+            .Include(o => o.Driver)
+            .Include(o => o.OrderItems);
 
         if (role == "Customer") query = query.Where(o => o.CustomerId == userId);
         if (role == "Driver") query = query.Where(o => o.DriverId == userId || o.Status == "Paid");

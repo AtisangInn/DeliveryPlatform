@@ -3,112 +3,175 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Nexus Courier - Performance Terminal</title>
+    <title>Easyway Driver</title>
+    <meta name="description" content="Easyway Deliveries driver app — accept orders and earn money delivering in Kagiso.">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
 <body class="driver-body">
 
-    <!-- Auth Layer -->
-    <div id="view-login" class="full-view driver-auth-bg">
-        <div class="auth-box">
-            <div class="brand">
-                <span class="logo-orb secondary">D</span>
-                <h1>COURIER</h1>
+    <!-- ============ AUTH ============ -->
+    <div id="authScreen" class="screen active-screen">
+        <div class="auth-container">
+            <div class="auth-brand">
+                <div class="brand-icon driver-brand">🛵</div>
+                <h1>Easyway</h1>
+                <p class="brand-sub">Driver Portal</p>
             </div>
-            <h2>Logistics Node Alpha</h2>
-            <form id="loginForm">
-                <input type="email" id="email" placeholder="Courier ID (Email)" required>
-                <input type="password" id="password" placeholder="Passkey" required>
-                <button type="submit" id="loginBtn" class="secondary-btn">Initiate Shift</button>
+            <form id="loginForm" class="auth-form">
+                <div class="input-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" placeholder="your@email.com" required>
+                </div>
+                <div class="input-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="••••••••" required>
+                </div>
+                <div id="authError" class="auth-error hidden"></div>
+                <button type="submit" id="loginBtn" class="btn-primary btn-lg">Start Driving</button>
             </form>
         </div>
     </div>
 
-    <!-- MAIN APP SHELL -->
-    <div id="app-content" class="hidden">
-        
-        <!-- HEADER -->
+    <!-- ============ MAIN APP ============ -->
+    <div id="appShell" class="hidden">
+
+        <!-- Header -->
         <header class="driver-header">
-            <div class="courier-profile">
-                <div class="avatar">⚡</div>
-                <div class="profile-text">
-                    <span id="courierName">Courier #001</span>
-                    <label class="status-pill online">ONLINE</label>
+            <div class="header-left">
+                <div class="driver-avatar-sm">🛵</div>
+                <div>
+                    <span class="driver-name" id="driverName">Driver</span>
+                    <div class="online-pill" id="onlinePill">
+                        <span class="online-dot"></span>
+                        Online
+                    </div>
                 </div>
             </div>
-            <div class="shift-stats">
-                <div class="stat">
-                    <label>EARNED</label>
-                    <span id="earnedToday">R0.00</span>
+            <div class="header-right">
+                <div class="earnings-badge">
+                    <span class="earnings-label">Today</span>
+                    <span class="earnings-value" id="earningsToday">R0.00</span>
                 </div>
             </div>
         </header>
 
-        <!-- VIEWS -->
-        <main class="view-container">
-            
-            <!-- RADAR: Searching for Jobs -->
-            <section id="view-radar" class="view">
-                <div class="radar-container">
-                    <div class="radar-circle"></div>
-                    <div class="radar-circle delay-1"></div>
-                    <div class="radar-circle delay-2"></div>
-                    <div class="radar-center">📡</div>
-                </div>
-                <div class="radar-status">
-                    <h2>Scanning for Requests...</h2>
-                    <p>Maintain your position in Kagiso for optimal ping.</p>
+        <!-- ============ AVAILABLE ORDERS VIEW ============ -->
+        <section id="viewAvailable" class="view active-view">
+            <div class="view-scroll">
+                <div class="section-title">
+                    <h2>Available Orders</h2>
+                    <button class="refresh-btn" onclick="loadAvailableJobs()">↻</button>
                 </div>
 
-                <div id="availableOrdersList" class="request-queue">
-                    <!-- Request cards -->
+                <div id="ordersList" class="orders-feed">
+                    <!-- Order cards -->
                 </div>
-            </section>
 
-            <!-- ACTIVE: Current Delivery -->
-            <section id="view-active" class="view hidden full-map-view">
-                <div id="driverMap"></div>
-                
-                <div class="job-status-sheet">
-                    <div class="job-header">
-                        <div class="job-merchant">
-                            <h3 id="activeMerchantName">Store Name</h3>
-                            <p id="activeAddress">Delivery Address</p>
+                <div id="emptyRadar" class="empty-state">
+                    <div class="radar-anim">
+                        <div class="radar-ring r1"></div>
+                        <div class="radar-ring r2"></div>
+                        <div class="radar-ring r3"></div>
+                        <span class="radar-icon">📡</span>
+                    </div>
+                    <h3>Scanning for orders...</h3>
+                    <p>New delivery requests will appear here</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ ACTIVE DELIVERY VIEW ============ -->
+        <section id="viewActive" class="view">
+            <div class="active-layout">
+                <!-- Map -->
+                <div class="active-map-wrap">
+                    <div id="driverMap" class="active-map"></div>
+                </div>
+
+                <!-- Job Panel -->
+                <div class="job-panel">
+                    <div class="panel-handle"></div>
+
+                    <div class="job-header-row">
+                        <div>
+                            <span class="job-label" id="jobStepLabel">PICKUP FROM</span>
+                            <h2 id="jobMerchant">Restaurant</h2>
                         </div>
-                        <div class="job-payout" id="activeAmount">R0.00</div>
+                        <div class="job-payout">
+                            <span>Earn</span>
+                            <strong id="jobEarning">R0.00</strong>
+                        </div>
                     </div>
 
-                    <div class="workflow-actions">
-                        <button id="btnPickupOrder" class="workflow-btn pickup" onclick="updateOrderStatus('PickedUp')">
-                            CONFIRM PICKUP
-                        </button>
-                        <button id="btnDeliverOrder" class="workflow-btn deliver hidden" onclick="updateOrderStatus('Delivered')">
-                            CONFIRM DELIVERY
-                        </button>
+                    <div class="job-address-row">
+                        <span class="job-pin">📍</span>
+                        <span id="jobAddress">Address</span>
                     </div>
+
+                    <div class="job-customer-row hidden" id="customerInfoRow">
+                        <span class="job-pin">👤</span>
+                        <span id="jobCustomer">Customer</span>
+                        <a id="callCustomerBtn" href="tel:" class="call-pill">📞 Call</a>
+                    </div>
+
+                    <!-- Navigation Button -->
+                    <a id="navBtn" href="#" target="_blank" class="nav-btn-action hidden">
+                        🗺️ Open in Google Maps
+                    </a>
+
+                    <!-- Workflow Buttons -->
+                    <button id="btnPickup" class="workflow-btn pickup-btn hidden" onclick="confirmPickup()">
+                        ✓ Confirm Pickup
+                    </button>
+                    <button id="btnDeliver" class="workflow-btn deliver-btn hidden" onclick="confirmDelivery()">
+                        ✓ Confirm Delivery
+                    </button>
                 </div>
-            </section>
+            </div>
+        </section>
 
-        </main>
+        <!-- ============ HISTORY VIEW ============ -->
+        <section id="viewHistory" class="view">
+            <div class="view-scroll">
+                <div class="section-title">
+                    <h2>Delivery History</h2>
+                </div>
+                <div id="historyList" class="orders-feed">
+                    <!-- Completed deliveries -->
+                </div>
+                <div id="emptyHistory" class="empty-state hidden">
+                    <span style="font-size:2.5rem;">📦</span>
+                    <h3>No deliveries yet</h3>
+                    <p>Completed deliveries will appear here</p>
+                </div>
+            </div>
+        </section>
 
-        <!-- BOTTOM NAV -->
-        <nav class="bottom-nav menu-fixed">
-            <button class="nav-btn active" onclick="switchView('radar', this)">
-                <span class="nav-icon">🎯</span>
-                <label>Radar</label>
+        <!-- ============ BOTTOM NAV ============ -->
+        <nav class="bottom-nav" id="bottomNav">
+            <button class="nav-item active" data-view="available" onclick="switchView('available', this)">
+                <span class="nav-icon">📋</span>
+                <span class="nav-label">Orders</span>
             </button>
-            <button class="nav-btn" onclick="switchView('active', this)">
-                <span class="nav-icon">📦</span>
-                <label>Active</label>
+            <button class="nav-item" data-view="active" onclick="switchView('active', this)">
+                <span class="nav-icon">🛵</span>
+                <span class="nav-label">Active</span>
             </button>
-            <button class="nav-btn" onclick="logout()">
-                <span class="nav-icon">🔌</span>
-                <label>End Shift</label>
+            <button class="nav-item" data-view="history" onclick="switchView('history', this)">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">History</span>
+            </button>
+            <button class="nav-item" onclick="logout()">
+                <span class="nav-icon">🚪</span>
+                <span class="nav-label">Logout</span>
             </button>
         </nav>
     </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast hidden"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

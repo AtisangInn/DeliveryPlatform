@@ -3,169 +3,286 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Nexus Delivery - Fresh. Fast. Local.</title>
+    <title>Easyway Deliveries — Fresh. Fast. Local.</title>
+    <meta name="description" content="Order delicious meals from local restaurants in Kagiso. Fast delivery to your door.">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
-<body class="customer-body">
+<body>
 
-    <!-- Auth / Landing -->
-    <div id="view-login" class="full-view landing-bg">
-        <div class="auth-box">
-            <div class="brand">
-                <span class="logo-orb">N</span>
-                <h1>NEXUS</h1>
+    <!-- ============ AUTH SCREEN ============ -->
+    <div id="authScreen" class="screen active-screen">
+        <div class="auth-container">
+            <div class="auth-brand">
+                <div class="brand-icon">🛵</div>
+                <h1>Easyway</h1>
+                <p>Deliveries for Kagiso</p>
             </div>
-            <h2>Deliciousness, Delivered.</h2>
-            <form id="loginForm">
-                <input type="email" id="email" placeholder="Email Address" required>
-                <input type="password" id="password" placeholder="Password" required>
-                <button type="submit" id="loginBtn" class="primary-btn">Sign In</button>
+
+            <!-- Login Form -->
+            <form id="loginForm" class="auth-form">
+                <h2 id="authTitle">Welcome back</h2>
+                <p id="authSubtitle" class="auth-subtitle">Sign in to start ordering</p>
+
+                <div id="registerFields" class="register-fields hidden">
+                    <div class="input-group">
+                        <label for="regName">Full Name</label>
+                        <input type="text" id="regName" placeholder="e.g. Thabo Molefe" autocomplete="name">
+                    </div>
+                    <div class="input-group">
+                        <label for="regPhone">Phone Number</label>
+                        <input type="tel" id="regPhone" placeholder="e.g. 0712345678" autocomplete="tel">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="authEmail">Email</label>
+                    <input type="email" id="authEmail" placeholder="your@email.com" required autocomplete="email">
+                </div>
+                <div class="input-group">
+                    <label for="authPassword">Password</label>
+                    <input type="password" id="authPassword" placeholder="••••••••" required autocomplete="current-password">
+                </div>
+
+                <div id="authError" class="auth-error hidden"></div>
+
+                <button type="submit" id="authBtn" class="btn-primary btn-lg">Sign In</button>
+
+                <p class="auth-toggle">
+                    <span id="toggleLabel">Don't have an account?</span>
+                    <a href="#" id="toggleAuth">Create Account</a>
+                </p>
             </form>
-            <p class="auth-footer">New to Nexus? <a href="#">Create Account</a></p>
         </div>
     </div>
 
-    <!-- MAIN APP SHELL -->
-    <div id="app-content" class="hidden">
-        
-        <!-- HEADER -->
-        <header class="app-header">
-            <div class="location-picker">
-                <span class="icon">📍</span>
-                <div class="loc-text">
-                    <label>Delivering to</label>
-                    <span id="currentLocation">123 Sandton Dr, Kagiso</span>
+    <!-- ============ MAIN APP ============ -->
+    <div id="appShell" class="hidden">
+
+        <!-- Top Header -->
+        <header id="appHeader" class="app-header">
+            <div class="header-left" id="addressPickerBtn">
+                <div class="header-icon">📍</div>
+                <div class="header-address">
+                    <span class="header-label">Deliver to</span>
+                    <span class="header-value" id="headerAddress">Set your address</span>
                 </div>
+                <span class="header-chevron">›</span>
             </div>
-            <button id="cartBtn" class="icon-btn">
-                🛒 <span id="cartCount" class="badge">0</span>
+            <button class="cart-fab" id="cartFab" onclick="openCart()">
+                <span>🛒</span>
+                <span class="cart-badge" id="cartBadge">0</span>
             </button>
         </header>
 
-        <!-- VIEWS -->
-        <main class="view-container">
-            
-            <!-- HOME: Merchant Discovery -->
-            <section id="view-home" class="view">
-                <div class="hero-search">
-                    <h1>What are we eating?</h1>
-                    <div class="search-input">
-                        <input type="text" placeholder="Burgers, Sushi, Groceries...">
+        <!-- ============ HOME VIEW ============ -->
+        <section id="viewHome" class="view active-view">
+            <div class="home-hero">
+                <h1>What are you<br>craving today?</h1>
+                <div class="search-bar" id="merchantSearchBar">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="merchantSearch" placeholder="Search restaurants or dishes..." oninput="filterMerchants(this.value)">
+                </div>
+            </div>
+
+            <div class="category-scroll" id="categoryScroll">
+                <!-- Categories injected -->
+            </div>
+
+            <div class="section-label">
+                <h2>Restaurants near you</h2>
+            </div>
+
+            <div id="merchantGrid" class="merchant-grid">
+                <!-- Merchant cards injected -->
+            </div>
+
+            <div id="emptyMerchants" class="empty-state hidden">
+                <span class="empty-icon">🍽️</span>
+                <h3>No restaurants available</h3>
+                <p>Check back soon — we're growing!</p>
+            </div>
+        </section>
+
+        <!-- ============ MENU VIEW ============ -->
+        <section id="viewMenu" class="view">
+            <div class="menu-header">
+                <button class="back-btn" onclick="goHome()">
+                    <span>←</span>
+                </button>
+                <div class="menu-merchant-info">
+                    <h1 id="menuName"></h1>
+                    <p id="menuMeta"></p>
+                </div>
+            </div>
+
+            <div id="menuCategories" class="menu-categories">
+                <!-- Category grouped items -->
+            </div>
+        </section>
+
+        <!-- ============ TRACKING VIEW ============ -->
+        <section id="viewTracking" class="view">
+            <div id="trackingMapContainer" class="tracking-map-container">
+                <div id="trackingMap" class="tracking-map"></div>
+                <button class="back-btn floating-back" onclick="goHome()">
+                    <span>←</span>
+                </button>
+            </div>
+
+            <div class="tracking-panel">
+                <div class="panel-handle"></div>
+
+                <div class="tracking-status-row">
+                    <div>
+                        <h2 id="trackingStatusText">Preparing your order</h2>
+                        <p class="tracking-order-id">Order #<span id="trackingOrderId">0000</span></p>
+                    </div>
+                    <div class="pulse-dot"></div>
+                </div>
+
+                <div class="tracking-timeline" id="trackingTimeline">
+                    <div class="timeline-step completed" data-step="confirmed">
+                        <div class="timeline-dot"></div>
+                        <span>Confirmed</span>
+                    </div>
+                    <div class="timeline-step" data-step="assigned">
+                        <div class="timeline-dot"></div>
+                        <span>Driver Assigned</span>
+                    </div>
+                    <div class="timeline-step" data-step="pickedup">
+                        <div class="timeline-dot"></div>
+                        <span>Picked Up</span>
+                    </div>
+                    <div class="timeline-step" data-step="delivered">
+                        <div class="timeline-dot"></div>
+                        <span>Delivered</span>
                     </div>
                 </div>
-                
-                <div class="category-strip">
-                    <div class="cat-pill active">All</div>
-                    <div class="cat-pill">Burgers</div>
-                    <div class="cat-pill">Pizza</div>
-                    <div class="cat-pill">Healthy</div>
-                </div>
 
-                <div class="section-title">Local Favorites</div>
-                <div id="merchantList" class="merchant-grid">
-                    <!-- Merchants injected here -->
-                </div>
-            </section>
-
-            <!-- MENU: Merchant Items -->
-            <section id="view-menu" class="view hidden">
-                <button class="back-btn" onclick="switchView('home')">← Back</button>
-                <div class="merchant-hero">
-                    <h2 id="menuMerchantName">Merchant Name</h2>
-                    <p id="menuMerchantCategory">Category</p>
-                </div>
-                <div id="menuItemsList" class="menu-list">
-                    <!-- Items -->
-                </div>
-            </section>
-
-            <!-- TRACKING: Live Order Status -->
-            <section id="view-tracking" class="view hidden full-map-view">
-                <div id="customerMap"></div>
-                <div class="tracking-sheet">
-                    <div class="handle"></div>
-                    <div class="tracking-content">
-                        <div class="status-header">
-                            <h3 id="trackStatus">Finding a Driver</h3>
-                            <div class="pulse-indicator"></div>
-                        </div>
-                        <div class="order-id">ORDER #<span id="trackOrderId">0000</span></div>
-                        
-                        <div class="track-path">
-                            <div class="path-step completed" id="step-paid">
-                                <div class="dot"></div>
-                                <span>Confirmed</span>
-                            </div>
-                            <div class="path-step" id="step-assigned">
-                                <div class="dot"></div>
-                                <span>Driver Assigned</span>
-                            </div>
-                            <div class="path-step" id="step-pickedup">
-                                <div class="dot"></div>
-                                <span>Out for Delivery</span>
-                            </div>
-                            <div class="path-step" id="step-delivered">
-                                <div class="dot"></div>
-                                <span>Delivered</span>
-                            </div>
-                        </div>
-
-                        <div id="driverDetails" class="driver-card hidden">
-                            <div class="driver-avatar">🏍️</div>
-                            <div class="driver-info">
-                                <strong id="driverName">Your Courier</strong>
-                                <span>Moving towards your location</span>
-                            </div>
-                            <button class="call-btn">📞</button>
-                        </div>
+                <div id="driverCard" class="driver-card hidden">
+                    <div class="driver-avatar">🏍️</div>
+                    <div class="driver-info">
+                        <strong id="driverCardName">Your driver</strong>
+                        <span id="driverCardStatus">On the way</span>
                     </div>
+                    <a id="driverCallBtn" href="tel:" class="call-btn">📞</a>
                 </div>
-            </section>
+            </div>
+        </section>
 
-        </main>
+        <!-- ============ ORDERS HISTORY VIEW ============ -->
+        <section id="viewOrders" class="view">
+            <div class="orders-header">
+                <h1>Your Orders</h1>
+            </div>
+            <div id="ordersList" class="orders-list">
+                <!-- Order history cards -->
+            </div>
+            <div id="emptyOrders" class="empty-state hidden">
+                <span class="empty-icon">📦</span>
+                <h3>No orders yet</h3>
+                <p>Your order history will appear here</p>
+            </div>
+        </section>
 
-        <!-- BOTTOM NAV -->
-        <nav class="bottom-nav">
-            <button class="nav-btn active" onclick="switchView('home', this)">
+        <!-- ============ BOTTOM NAV ============ -->
+        <nav class="bottom-nav" id="bottomNav">
+            <button class="nav-item active" data-view="home" onclick="navigateTo('home', this)">
                 <span class="nav-icon">🏠</span>
-                <label>Browse</label>
+                <span class="nav-label">Home</span>
             </button>
-            <button class="nav-btn" onclick="switchView('tracking', this)">
-                <span class="nav-icon">📦</span>
-                <label>Track</label>
+            <button class="nav-item" data-view="orders" onclick="navigateTo('orders', this)">
+                <span class="nav-icon">📋</span>
+                <span class="nav-label">Orders</span>
             </button>
-            <button class="nav-btn" onclick="logout()">
+            <button class="nav-item" data-view="tracking" onclick="navigateTo('tracking', this)">
+                <span class="nav-icon">📍</span>
+                <span class="nav-label">Track</span>
+            </button>
+            <button class="nav-item" onclick="logout()">
                 <span class="nav-icon">👤</span>
-                <label>Profile</label>
+                <span class="nav-label">Logout</span>
             </button>
         </nav>
     </div>
 
-    <!-- CART SHEET -->
-    <div id="cartSheet" class="modal-overlay hidden">
-        <div class="sheet-content">
+    <!-- ============ CART SHEET ============ -->
+    <div id="cartOverlay" class="sheet-overlay hidden" onclick="closeCart()">
+        <div class="sheet" onclick="event.stopPropagation()">
             <div class="sheet-header">
-                <h3>Your Basket</h3>
-                <button onclick="toggleCart()" class="close-btn">✕</button>
+                <h2>Your Cart</h2>
+                <button class="close-btn" onclick="closeCart()">✕</button>
             </div>
-            <div id="cartItemsList" class="cart-items">
+
+            <div id="cartItems" class="cart-items">
                 <!-- Cart items -->
             </div>
-            <div class="cart-summary">
-                <div class="sum-row">
-                    <span>Subtotal</span>
-                    <span id="cartSubtotal">R0.00</span>
+
+            <div id="cartEmpty" class="empty-state" style="padding: 2rem;">
+                <span class="empty-icon">🛒</span>
+                <h3>Cart is empty</h3>
+                <p>Add some items to get started</p>
+            </div>
+
+            <div id="cartFooter" class="cart-footer hidden">
+                <div class="cart-summary">
+                    <div class="summary-row">
+                        <span>Subtotal</span>
+                        <span id="cartSubtotal">R0.00</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Delivery Fee</span>
+                        <span>R35.00</span>
+                    </div>
+                    <div class="summary-row total">
+                        <span>Total</span>
+                        <span id="cartTotal">R0.00</span>
+                    </div>
                 </div>
-                <div class="sum-row total">
-                    <span>Total</span>
-                    <span id="cartTotal">R0.00</span>
+
+                <!-- Delivery Address -->
+                <div class="address-section">
+                    <label class="address-label">Delivery Address</label>
+                    <div class="address-input-wrap">
+                        <span class="address-pin">📍</span>
+                        <input type="text" id="deliveryAddressInput" placeholder="Start typing your address..." autocomplete="off" oninput="searchAddress(this.value)">
+                    </div>
+                    <div id="addressResults" class="address-dropdown hidden">
+                        <!-- Address suggestions -->
+                    </div>
+                    <p id="selectedAddress" class="selected-address hidden"></p>
                 </div>
-                <button id="checkoutBtn" onclick="processCheckout()" class="primary-btn checkout-btn">Confirm & Pay</button>
+
+                <button id="checkoutBtn" class="btn-primary btn-lg checkout-btn" onclick="processCheckout()">
+                    Place Order & Pay
+                </button>
             </div>
         </div>
     </div>
+
+    <!-- ============ ADDRESS PICKER MODAL ============ -->
+    <div id="addressModal" class="sheet-overlay hidden" onclick="closeAddressModal()">
+        <div class="sheet" onclick="event.stopPropagation()">
+            <div class="sheet-header">
+                <h2>Delivery Address</h2>
+                <button class="close-btn" onclick="closeAddressModal()">✕</button>
+            </div>
+            <div style="padding: 1.5rem;">
+                <div class="address-input-wrap">
+                    <span class="address-pin">📍</span>
+                    <input type="text" id="modalAddressInput" placeholder="Search for your address..." autocomplete="off" oninput="searchAddressModal(this.value)">
+                </div>
+                <div id="modalAddressResults" class="address-dropdown-static">
+                    <!-- Address suggestions -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

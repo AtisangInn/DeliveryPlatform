@@ -1,241 +1,536 @@
-const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? 'http://localhost:5000/api' 
+/* ============================================
+   EASYWAY DELIVERIES — CUSTOMER APP
+   Production-ready JavaScript
+   ============================================ */
+
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:5000/api'
     : 'https://deliveryplatform.onrender.com/api';
 
-// --- STATE ---
+const DELIVERY_FEE = 35.00;
+const KAGISO_CENTER = [-26.155, 27.778];
+
+// ─── STATE ───
 let state = {
-    authToken: localStorage.getItem('nexus_cust_token'),
-    userName: localStorage.getItem('nexus_cust_name'),
-    activeView: 'home',
+    authToken: localStorage.getItem('ew_token'),
+    userName: localStorage.getItem('ew_name'),
+    isRegister: false,
     merchants: [],
     selectedMerchant: null,
     cart: [],
-    activeOrder: null, // Full order object when tracking
-    markers: {
-        merchant: null,
-        customer: null,
-        driver: null
-    }
+    deliveryAddress: localStorage.getItem('ew_address') || '',
+    deliveryLat: parseFloat(localStorage.getItem('ew_lat')) || null,
+    deliveryLng: parseFloat(localStorage.getItem('ew_lng')) || null,
+    activeOrder: null,
+    driverInfo: null,
+    markers: { merchant: null, customer: null, driver: null }
 };
 
 let hubConnection = null;
-let customerMap = null;
-const KAGISO_COORDS = [-26.175, 27.882];
+let trackingMap = null;
+let addressTimer = null;
 
-// --- INIT ---
-async function init() {
-    setupUI();
+// ─── INIT ───
+function init() {
     if (state.authToken) {
         showApp();
     } else {
-        switchView('login');
+        showAuth();
     }
+    setupAuthListeners();
+}
+
+function showAuth() {
+    document.getElementById('authScreen').classList.add('active-screen');
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('appShell').classList.add('hidden');
 }
 
 function showApp() {
-    document.getElementById('view-login').classList.add('hidden');
-    document.getElementById('app-content').classList.remove('hidden');
-    document.getElementById('currentLocation').textContent = "123 Sandton Dr, Kagiso";
-    
-    refreshMerchants();
+    document.getElementById('authScreen').classList.remove('active-screen');
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('appShell').classList.remove('hidden');
+
+    if (state.deliveryAddress) {
+        document.getElementById('headerAddress').textContent = state.deliveryAddress;
+    }
+
+    document.getElementById('addressPickerBtn').addEventListener('click', openAddressModal);
+
+    loadMerchants();
     connectHub();
     checkActiveOrders();
 }
 
-// --- NAVIGATION ---
-function switchView(viewId, navBtn) {
-    state.activeView = viewId;
-    document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
-    document.getElementById(`view-${viewId}`).classList.remove('hidden');
+// ─── AUTH ───
+function setupAuthListeners() {
+    document.getElementById('loginForm').addEventListener('submit', handleAuth);
+    document.getElementById('toggleAuth').addEventListener('click', (e) => {
+        e.preventDefault();
+        state.isRegister = !state.isRegister;
+        const fields = document.getElementById('registerFields');
+        const btn = document.getElementById('authBtn');
+        const title = document.getElementById('authTitle');
+        const subtitle = document.getElementById('authSubtitle');
+        const toggleLabel = document.getElementById('toggleLabel');
+        const toggleLink = document.getElementById('toggleAuth');
 
-    if (navBtn) {
-        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        navBtn.classList.add('active');
+        if (state.isRegister) {
+            fields.classList.add('show');
+            fields.classList.remove('hidden');
+            btn.textContent = 'Create Account';
+            title.textContent = 'Create account';
+            subtitle.textContent = 'Sign up to start ordering';
+            toggleLabel.textContent = 'Already have an account?';
+            toggleLink.textContent = 'Sign In';
+        } else {
+            fields.classList.remove('show');
+            setTimeout(() => fields.classList.add('hidden'), 400);
+            btn.textContent = 'Sign In';
+            title.textContent = 'Welcome back';
+            subtitle.textContent = 'Sign in to start ordering';
+            toggleLabel.textContent = "Don't have an account?";
+            toggleLink.textContent = 'Create Account';
+        }
+        document.getElementById('authError').classList.add('hidden');
+    });
+}
+
+async function handleAuth(e) {
+    e.preventDefault();
+    const btn = document.getElementById('authBtn');
+    const errEl = document.getElementById('authError');
+    errEl.classList.add('hidden');
+    btn.disabled = true;
+    btn.textContent = state.isRegister ? 'Creating...' : 'Signing in...';
+
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+
+    try {
+        if (state.isRegister) {
+            const name = document.getElementById('regName').value.trim();
+            const phone = document.getElementById('regPhone').value.trim();
+            if (!name || !phone) throw new Error('Please fill in all fields');
+
+            const regRes = await fetch(`${API_URL}/Auth/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fullName: name, email, password, phone, role: 'Customer' })
+            });
+            if (!regRes.ok) {
+                const msg = await regRes.text();
+                throw new Error(msg || 'Registration failed');
+            }
+        }
+
+        // Login
+        const loginRes = await fetch(`${API_URL}/Auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+
+        if (!loginRes.ok) throw new Error('Invalid email or password');
+        const data = await loginRes.json();
+
+        state.authToken = data.token;
+        state.userName = data.fullName;
+        localStorage.setItem('ew_token', data.token);
+        localStorage.setItem('ew_name', data.fullName);
+
+        showApp();
+    } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove('hidden');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = state.isRegister ? 'Create Account' : 'Sign In';
+    }
+}
+
+// ─── NAVIGATION ───
+function navigateTo(viewId, btn) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active-view'));
+    const target = document.getElementById('view' + viewId.charAt(0).toUpperCase() + viewId.slice(1));
+    if (target) target.classList.add('active-view');
+
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+
+    if (viewId === 'home') loadMerchants();
+    if (viewId === 'orders') loadOrders();
+    if (viewId === 'tracking') initTracking();
+
+    // Show/hide header for tracking view
+    document.getElementById('appHeader').style.display = viewId === 'tracking' ? 'none' : 'flex';
+    document.getElementById('bottomNav').style.display = viewId === 'tracking' ? 'none' : 'flex';
+}
+
+function goHome() {
+    navigateTo('home', document.querySelector('.nav-item[data-view="home"]'));
+}
+
+// ─── MERCHANTS ───
+async function loadMerchants() {
+    try {
+        const res = await fetch(`${API_URL}/Merchant`, {
+            headers: { 'Authorization': `Bearer ${state.authToken}` }
+        });
+        if (res.status === 401) return logout();
+        state.merchants = await res.json();
+
+        // Load menu items for each merchant
+        for (let m of state.merchants) {
+            try {
+                const mRes = await fetch(`${API_URL}/Merchant/${m.id}`, {
+                    headers: { 'Authorization': `Bearer ${state.authToken}` }
+                });
+                if (mRes.ok) {
+                    const full = await mRes.json();
+                    m.menuItems = full.menuItems || [];
+                }
+            } catch (e) { m.menuItems = []; }
+        }
+
+        renderMerchants();
+        renderCategories();
+    } catch (e) {
+        console.error('Load merchants failed:', e);
+    }
+}
+
+function renderMerchants(filter = '') {
+    const grid = document.getElementById('merchantGrid');
+    const empty = document.getElementById('emptyMerchants');
+    let filtered = state.merchants;
+
+    if (filter) {
+        const q = filter.toLowerCase();
+        filtered = filtered.filter(m =>
+            m.name.toLowerCase().includes(q) ||
+            m.category.toLowerCase().includes(q) ||
+            (m.menuItems || []).some(i => i.name.toLowerCase().includes(q))
+        );
     }
 
-    if (viewId === 'home') refreshMerchants();
-    if (viewId === 'tracking') initTrackingView();
-}
-
-// --- DATA & SYNC ---
-async function refreshMerchants() {
-    state.merchants = await apiGet('Merchant');
-    renderMerchants();
-}
-
-async function checkActiveOrders() {
-    const orders = await apiGet('Order');
-    const active = orders.find(o => ['Paid', 'Assigned', 'PickedUp', 'Preparing', 'OutForDelivery'].includes(o.status));
-    if (active) {
-        state.activeOrder = active;
-        hubConnection?.invoke("JoinOrder", active.id);
-        switchView('tracking', document.querySelectorAll('.nav-btn')[1]);
-    }
-}
-
-async function connectHub() {
-    if (hubConnection) return;
-    hubConnection = new signalR.HubConnectionBuilder()
-        .withUrl(API_URL.replace('/api', '/orderhub'), { accessTokenFactory: () => state.authToken })
-        .withAutomaticReconnect()
-        .build();
-
-    hubConnection.on("StatusUpdated", (data) => {
-        if (state.activeOrder && data.orderId === state.activeOrder.id) {
-            state.activeOrder.status = data.status;
-            renderTracking();
-        }
-    });
-
-    hubConnection.on("DriverLocationUpdated", (data) => {
-        if (state.activeOrder && data.orderId === state.activeOrder.id) {
-            updateDriverMarker(data.lat, data.lng);
-        }
-    });
-
-    try { await hubConnection.start(); } catch (e) { console.error("Hub fail", e); }
-}
-
-// --- RENDERING ---
-function renderMerchants() {
-    const list = document.getElementById('merchantList');
-    list.innerHTML = state.merchants.map(m => `
-        <div class="merchant-card" onclick="openMerchant(${m.id})">
-            <div class="m-icon">🍔</div>
-            <div class="m-info">
-                <h3>${m.name}</h3>
-                <p>${m.category} • 15-25 min</p>
-            </div>
-        </div>
-    `).join('');
-}
-
-async function openMerchant(id) {
-    const m = state.merchants.find(x => x.id === id);
-    state.selectedMerchant = m;
-    switchView('menu');
-    document.getElementById('menuMerchantName').textContent = m.name;
-    document.getElementById('menuMerchantCategory').textContent = m.category;
-    
-    // Fetch Menu (Ensure real IDs from DB are used)
-    const menuItems = m.menuItems || [];
-
-    if (menuItems.length === 0) {
-        document.getElementById('menuItemsList').innerHTML = `<p style="padding:2rem; text-align:center; color:var(--text-secondary)">No items available yet.</p>`;
+    if (filtered.length === 0) {
+        grid.innerHTML = '';
+        empty.classList.remove('hidden');
         return;
     }
 
-    document.getElementById('menuItemsList').innerHTML = menuItems.map(item => `
-        <div class="menu-item">
-            <div>
-                <h4>${item.name}</h4>
-                <p style="font-size:0.75rem; color:var(--text-secondary)">${item.description}</p>
-                <strong style="color:var(--primary)">R${item.price.toFixed(2)}</strong>
-            </div>
-            <button class="add-btn" onclick="addToCart(${item.id}, '${item.name}', ${item.price})">+</button>
-        </div>
-    `).join('');
-}
-
-function initTrackingView() {
-    if (!state.activeOrder) {
-        document.getElementById('view-tracking').innerHTML = `
-            <div style="padding: 4rem 2rem; text-align:center">
-                <h2>No Active Orders</h2>
-                <p style="color:var(--text-secondary); margin-top:1rem">Order some food to start tracking.</p>
-                <button class="primary-btn" style="margin-top:2rem" onclick="switchView('home')">Go Shopping</button>
+    empty.classList.add('hidden');
+    grid.innerHTML = filtered.map(m => {
+        const itemCount = (m.menuItems || []).length;
+        const emoji = getCategoryEmoji(m.category);
+        return `
+            <div class="merchant-card" onclick="openMerchant(${m.id})">
+                <div class="merchant-card-img">
+                    ${emoji}
+                    <span class="merchant-tag">${m.category}</span>
+                </div>
+                <div class="merchant-card-body">
+                    <h3>${m.name}</h3>
+                    <div class="merchant-card-meta">
+                        <span>${itemCount} items</span>
+                        <span class="meta-dot"></span>
+                        <span>R${DELIVERY_FEE.toFixed(0)} delivery</span>
+                    </div>
+                </div>
             </div>
         `;
-        return;
-    }
-    
-    if (!customerMap) {
-        customerMap = L.map('customerMap', { zoomControl: false }).setView(KAGISO_COORDS, 15);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(customerMap);
-    }
-    renderTracking();
+    }).join('');
 }
 
-function renderTracking() {
-    const o = state.activeOrder;
-    if (!o) return;
-
-    document.getElementById('trackStatus').textContent = o.status.replace(/([A-Z])/g, ' $1').trim();
-    document.getElementById('trackOrderId').textContent = o.id.toString().padStart(4, '0');
-
-    // Update Path Steps
-    const statusMap = { 'Paid': 1, 'Assigned': 2, 'Preparing': 2, 'PickedUp': 3, 'OutForDelivery': 3, 'Delivered': 4 };
-    const currentStep = statusMap[o.status] || 1;
-
-    document.querySelectorAll('.path-step').forEach((s, idx) => {
-        s.classList.remove('completed', 'active');
-        if (idx + 1 < currentStep) s.classList.add('completed');
-        if (idx + 1 === currentStep) s.classList.add('active');
-    });
-
-    // Map Markers
-    if (!state.markers.customer) {
-        state.markers.customer = L.marker([o.deliveryLatitude, o.deliveryLongitude], {
-            icon: L.divIcon({ className: 'nexus-pin pin-customer', html: '🏠', iconSize: [30,30] })
-        }).addTo(customerMap);
-    }
-
-    if (o.merchant && !state.markers.merchant) {
-        state.markers.merchant = L.marker([o.merchant.latitude, o.merchant.longitude], {
-            icon: L.divIcon({ className: 'nexus-pin pin-merchant', html: '🏪', iconSize: [30,30] })
-        }).addTo(customerMap);
-    }
+function getCategoryEmoji(cat) {
+    const map = {
+        'Fast Food': '🍔', 'Pizza': '🍕', 'African Cuisine': '🍲',
+        'Drinks': '🥤', 'Desserts': '🍰', 'Coffee': '☕'
+    };
+    return map[cat] || '🍽️';
 }
 
-function updateDriverMarker(lat, lng) {
-    if (!customerMap) return;
-    document.getElementById('driverDetails').classList.remove('hidden');
-    
-    if (!state.markers.driver) {
-        state.markers.driver = L.marker([lat, lng], {
-            icon: L.divIcon({ className: 'nexus-pin pin-driver', html: '🏍️', iconSize: [36,36] })
-        }).addTo(customerMap);
-    } else {
-        state.markers.driver.setLatLng([lat, lng]);
-    }
-    customerMap.panTo([lat, lng]);
-}
-
-// --- CART & CHECKOUT ---
-function addToCart(id, name, price) {
-    const existing = state.cart.find(i => i.id === id);
-    if(existing) existing.qty++;
-    else state.cart.push({ id, name, price, qty: 1 });
-    renderCart();
-}
-
-function renderCart() {
-    const count = state.cart.reduce((s, i) => s + i.qty, 0);
-    document.getElementById('cartCount').textContent = count;
-    
-    const subtotal = state.cart.reduce((s, i) => s + (i.price * i.qty), 0);
-    document.getElementById('cartSubtotal').textContent = `R${subtotal.toFixed(2)}`;
-    document.getElementById('cartTotal').textContent = `R${(subtotal + 20).toFixed(2)}`;
-    
-    document.getElementById('cartItemsList').innerHTML = state.cart.map(item => `
-        <div class="cart-item" style="display:flex; justify-content:space-between; margin-bottom:1rem">
-            <span>${item.qty}x ${item.name}</span>
-            <strong>R${(item.price * item.qty).toFixed(2)}</strong>
-        </div>
+function renderCategories() {
+    const cats = [...new Set(state.merchants.map(m => m.category))];
+    const scroll = document.getElementById('categoryScroll');
+    scroll.innerHTML = ['All', ...cats].map((c, i) => `
+        <button class="cat-chip ${i === 0 ? 'active' : ''}" onclick="filterByCategory('${c}', this)">${c}</button>
     `).join('');
 }
 
+function filterByCategory(cat, btn) {
+    document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    if (cat === 'All') {
+        renderMerchants();
+    } else {
+        const grid = document.getElementById('merchantGrid');
+        const empty = document.getElementById('emptyMerchants');
+        const filtered = state.merchants.filter(m => m.category === cat);
+        if (filtered.length === 0) {
+            grid.innerHTML = '';
+            empty.classList.remove('hidden');
+        } else {
+            empty.classList.add('hidden');
+            grid.innerHTML = filtered.map(m => {
+                const emoji = getCategoryEmoji(m.category);
+                return `
+                    <div class="merchant-card" onclick="openMerchant(${m.id})">
+                        <div class="merchant-card-img">
+                            ${emoji}
+                            <span class="merchant-tag">${m.category}</span>
+                        </div>
+                        <div class="merchant-card-body">
+                            <h3>${m.name}</h3>
+                            <div class="merchant-card-meta">
+                                <span>${(m.menuItems||[]).length} items</span>
+                                <span class="meta-dot"></span>
+                                <span>R${DELIVERY_FEE.toFixed(0)} delivery</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+}
+
+function filterMerchants(val) {
+    renderMerchants(val);
+}
+
+// ─── MENU ───
+function openMerchant(id) {
+    const m = state.merchants.find(x => x.id === id);
+    if (!m) return;
+    state.selectedMerchant = m;
+
+    document.getElementById('menuName').textContent = m.name;
+    document.getElementById('menuMeta').textContent = `${m.category} • ${m.address}`;
+
+    const items = m.menuItems || [];
+    const container = document.getElementById('menuCategories');
+
+    if (items.length === 0) {
+        container.innerHTML = `<div class="empty-state"><span class="empty-icon">🍽️</span><h3>Menu coming soon</h3><p>This restaurant is setting up their menu.</p></div>`;
+    } else {
+        // Group by category
+        const groups = {};
+        items.forEach(item => {
+            const cat = item.category || 'Menu';
+            if (!groups[cat]) groups[cat] = [];
+            groups[cat].push(item);
+        });
+
+        container.innerHTML = Object.entries(groups).map(([cat, catItems]) => `
+            <h3 class="menu-category-title">${cat}</h3>
+            ${catItems.filter(i => i.isAvailable).map(item => `
+                <div class="menu-item">
+                    <div class="menu-item-info">
+                        <h4>${item.name}</h4>
+                        <p class="item-desc">${item.description}</p>
+                        <span class="item-price">R${item.price.toFixed(2)}</span>
+                    </div>
+                    <button class="add-item-btn" onclick="addToCart(${item.id}, '${item.name.replace(/'/g, "\\'")}', ${item.price})">+</button>
+                </div>
+            `).join('')}
+        `).join('');
+    }
+
+    navigateTo('menu', null);
+    document.getElementById('viewMenu').classList.add('active-view');
+    document.getElementById('appHeader').style.display = 'none';
+}
+
+// ─── CART ───
+function addToCart(id, name, price) {
+    const existing = state.cart.find(i => i.id === id);
+    if (existing) {
+        existing.qty++;
+    } else {
+        state.cart.push({ id, name, price, qty: 1 });
+    }
+    updateCartBadge();
+    showToast(`${name} added to cart`);
+}
+
+function removeFromCart(id) {
+    state.cart = state.cart.filter(i => i.id !== id);
+    updateCartBadge();
+    renderCartSheet();
+}
+
+function changeQty(id, delta) {
+    const item = state.cart.find(i => i.id === id);
+    if (!item) return;
+    item.qty += delta;
+    if (item.qty <= 0) {
+        state.cart = state.cart.filter(i => i.id !== id);
+    }
+    updateCartBadge();
+    renderCartSheet();
+}
+
+function updateCartBadge() {
+    const count = state.cart.reduce((s, i) => s + i.qty, 0);
+    document.getElementById('cartBadge').textContent = count;
+}
+
+function openCart() {
+    renderCartSheet();
+    document.getElementById('cartOverlay').classList.remove('hidden');
+}
+
+function closeCart() {
+    document.getElementById('cartOverlay').classList.add('hidden');
+}
+
+function renderCartSheet() {
+    const container = document.getElementById('cartItems');
+    const empty = document.getElementById('cartEmpty');
+    const footer = document.getElementById('cartFooter');
+
+    if (state.cart.length === 0) {
+        container.innerHTML = '';
+        empty.classList.remove('hidden');
+        footer.classList.add('hidden');
+        return;
+    }
+
+    empty.classList.add('hidden');
+    footer.classList.remove('hidden');
+
+    container.innerHTML = state.cart.map(item => `
+        <div class="cart-item">
+            <div class="cart-item-info">
+                <h4>${item.name}</h4>
+                <span>R${(item.price * item.qty).toFixed(2)}</span>
+            </div>
+            <div class="qty-controls">
+                <button class="qty-btn" onclick="changeQty(${item.id}, -1)">−</button>
+                <span class="qty-value">${item.qty}</span>
+                <button class="qty-btn" onclick="changeQty(${item.id}, 1)">+</button>
+            </div>
+        </div>
+    `).join('');
+
+    const subtotal = state.cart.reduce((s, i) => s + (i.price * i.qty), 0);
+    document.getElementById('cartSubtotal').textContent = `R${subtotal.toFixed(2)}`;
+    document.getElementById('cartTotal').textContent = `R${(subtotal + DELIVERY_FEE).toFixed(2)}`;
+
+    // Populate address if saved
+    const addrInput = document.getElementById('deliveryAddressInput');
+    if (state.deliveryAddress && !addrInput.value) {
+        addrInput.value = state.deliveryAddress;
+    }
+}
+
+// ─── ADDRESS AUTOCOMPLETE (NOMINATIM) ───
+function searchAddress(query) {
+    clearTimeout(addressTimer);
+    const results = document.getElementById('addressResults');
+    if (query.length < 3) {
+        results.classList.add('hidden');
+        return;
+    }
+    addressTimer = setTimeout(async () => {
+        try {
+            const res = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Kagiso, South Africa')}&limit=5&addressdetails=1`,
+                { headers: { 'Accept-Language': 'en' } }
+            );
+            const data = await res.json();
+            if (data.length === 0) {
+                results.innerHTML = '<div class="address-option" style="color:var(--text-muted)">No addresses found</div>';
+            } else {
+                results.innerHTML = data.map(a => `
+                    <div class="address-option" onclick="selectAddress('${a.display_name.replace(/'/g, "\\'")}', ${a.lat}, ${a.lon})">
+                        📍 ${a.display_name}
+                    </div>
+                `).join('');
+            }
+            results.classList.remove('hidden');
+        } catch (e) { console.error('Geocode error:', e); }
+    }, 400);
+}
+
+function selectAddress(display, lat, lng) {
+    state.deliveryAddress = display;
+    state.deliveryLat = lat;
+    state.deliveryLng = lng;
+    localStorage.setItem('ew_address', display);
+    localStorage.setItem('ew_lat', lat);
+    localStorage.setItem('ew_lng', lng);
+
+    document.getElementById('deliveryAddressInput').value = display;
+    document.getElementById('addressResults').classList.add('hidden');
+    document.getElementById('headerAddress').textContent = display.split(',')[0];
+
+    const selected = document.getElementById('selectedAddress');
+    selected.textContent = '✓ Address confirmed';
+    selected.classList.remove('hidden');
+}
+
+// Address modal
+function openAddressModal() {
+    document.getElementById('addressModal').classList.remove('hidden');
+    document.getElementById('modalAddressInput').value = '';
+    document.getElementById('modalAddressResults').innerHTML = '';
+    setTimeout(() => document.getElementById('modalAddressInput').focus(), 300);
+}
+
+function closeAddressModal() {
+    document.getElementById('addressModal').classList.add('hidden');
+}
+
+function searchAddressModal(query) {
+    clearTimeout(addressTimer);
+    const results = document.getElementById('modalAddressResults');
+    if (query.length < 3) {
+        results.innerHTML = '';
+        return;
+    }
+    addressTimer = setTimeout(async () => {
+        try {
+            const res = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Kagiso, South Africa')}&limit=5&addressdetails=1`,
+                { headers: { 'Accept-Language': 'en' } }
+            );
+            const data = await res.json();
+            results.innerHTML = data.length === 0
+                ? '<div class="address-option" style="color:var(--text-muted)">No addresses found</div>'
+                : data.map(a => `
+                    <div class="address-option" onclick="selectAddressModal('${a.display_name.replace(/'/g, "\\'")}', ${a.lat}, ${a.lon})">
+                        📍 ${a.display_name}
+                    </div>
+                `).join('');
+        } catch (e) { console.error('Geocode error:', e); }
+    }, 400);
+}
+
+function selectAddressModal(display, lat, lng) {
+    selectAddress(display, lat, lng);
+    closeAddressModal();
+    showToast('Delivery address updated');
+}
+
+// ─── CHECKOUT ───
 async function processCheckout() {
+    if (state.cart.length === 0) return showToast('Cart is empty');
+    if (!state.deliveryAddress || !state.deliveryLat) return showToast('Please set your delivery address');
+
     const btn = document.getElementById('checkoutBtn');
-    const originalText = btn.textContent;
-    btn.textContent = 'INITIATING SECURE PAYMENT...';
     btn.disabled = true;
-    
+    btn.textContent = 'Processing...';
+
     const payload = {
         merchantId: state.selectedMerchant.id,
-        deliveryAddress: "123 Sandton Dr, Kagiso",
-        items: state.cart.map(i => ({ 
-            menuItemId: i.id, 
+        deliveryAddress: state.deliveryAddress,
+        deliveryLatitude: state.deliveryLat,
+        deliveryLongitude: state.deliveryLng,
+        items: state.cart.map(i => ({
+            menuItemId: i.id,
             name: i.name,
             quantity: i.qty,
             price: i.price
@@ -245,59 +540,328 @@ async function processCheckout() {
     try {
         const res = await fetch(`${API_URL}/Order/checkout`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.authToken}` },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.authToken}`
+            },
             body: JSON.stringify(payload)
         });
-        
+
         if (!res.ok) {
-            const errorText = await res.text();
-            throw new Error(errorText || "Checkout failed at gateway");
+            const errText = await res.text();
+            throw new Error(errText || 'Checkout failed');
         }
 
         const data = await res.json();
-        document.open(); 
-        document.write(data.paymentHtmlForm); 
-        document.close();
-    } catch (e) { 
-        alert(`Checkout Error: ${e.message}`); 
-        btn.textContent = originalText;
+
+        // Redirect to PayFast
+        if (data.paymentHtmlForm) {
+            document.open();
+            document.write(data.paymentHtmlForm);
+            document.close();
+        }
+    } catch (e) {
+        showToast(e.message);
         btn.disabled = false;
+        btn.textContent = 'Place Order & Pay';
     }
 }
 
-// --- CORE UTILS ---
-async function apiGet(endpoint) {
-    const res = await fetch(`${API_URL}/${endpoint}`, { headers: { 'Authorization': `Bearer ${state.authToken}` } });
-    if(res.status === 401) logout();
-    return await res.json();
-}
-
-function setupUI() {
-    document.getElementById('loginForm').addEventListener('submit', handleLogin);
-}
-
-async function handleLogin(e) {
-    e.preventDefault();
-    const btn = document.getElementById('loginBtn');
-    btn.textContent = 'AUTHENTICATING...';
+// ─── ORDERS ───
+async function loadOrders() {
     try {
-        const res = await fetch(`${API_URL}/Auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: document.getElementById('email').value, password: document.getElementById('password').value })
+        const res = await fetch(`${API_URL}/Order`, {
+            headers: { 'Authorization': `Bearer ${state.authToken}` }
         });
-        const data = await res.json();
-        state.authToken = data.token;
-        state.userName = data.fullName;
-        localStorage.setItem('nexus_cust_token', data.token);
-        localStorage.setItem('nexus_cust_name', data.fullName);
-        showApp();
-    } catch (e) { alert("Login failed"); btn.textContent = "Sign In"; }
+        if (res.status === 401) return logout();
+        const orders = await res.json();
+
+        const list = document.getElementById('ordersList');
+        const empty = document.getElementById('emptyOrders');
+
+        if (orders.length === 0) {
+            list.innerHTML = '';
+            empty.classList.remove('hidden');
+            return;
+        }
+
+        empty.classList.add('hidden');
+        list.innerHTML = orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(o => {
+            const isActive = ['Paid', 'Assigned', 'PickedUp', 'Preparing', 'OutForDelivery'].includes(o.status);
+            const badgeClass = o.status === 'Delivered' ? 'badge-delivered' : isActive ? 'badge-active' : 'badge-cancelled';
+            const date = new Date(o.createdAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+            return `
+                <div class="order-history-card" ${isActive ? `onclick="viewActiveOrder(${o.id})"` : ''}>
+                    <div class="order-history-top">
+                        <h4>${o.merchant?.name || 'Restaurant'}</h4>
+                        <span class="order-status-badge ${badgeClass}">${o.status}</span>
+                    </div>
+                    <p class="order-history-meta">${date} • Order #${o.id}</p>
+                    <div class="order-history-bottom">
+                        <span>${o.orderItems?.length || 0} items</span>
+                        <strong>R${o.totalAmount?.toFixed(2) || '0.00'}</strong>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (e) {
+        console.error('Load orders failed:', e);
+    }
 }
 
-function toggleCart() { document.getElementById('cartSheet').classList.toggle('hidden'); }
-document.getElementById('cartBtn').addEventListener('click', toggleCart);
+async function checkActiveOrders() {
+    try {
+        const res = await fetch(`${API_URL}/Order`, {
+            headers: { 'Authorization': `Bearer ${state.authToken}` }
+        });
+        if (!res.ok) return;
+        const orders = await res.json();
+        const active = orders.find(o => ['Paid', 'Assigned', 'PickedUp', 'Preparing', 'OutForDelivery'].includes(o.status));
+        if (active) {
+            state.activeOrder = active;
+            if (hubConnection && hubConnection.state === 'Connected') {
+                hubConnection.invoke('JoinOrder', active.id).catch(() => {});
+            }
+            navigateTo('tracking', document.querySelector('.nav-item[data-view="tracking"]'));
+        }
+    } catch (e) { console.error('Check active orders failed:', e); }
+}
 
-function logout() { localStorage.clear(); location.reload(); }
+function viewActiveOrder(orderId) {
+    const order = { id: orderId };
+    state.activeOrder = order;
+    navigateTo('tracking', document.querySelector('.nav-item[data-view="tracking"]'));
+    // Reload full order data
+    fetchOrderDetails(orderId);
+}
 
+async function fetchOrderDetails(orderId) {
+    try {
+        const res = await fetch(`${API_URL}/Order`, {
+            headers: { 'Authorization': `Bearer ${state.authToken}` }
+        });
+        if (!res.ok) return;
+        const orders = await res.json();
+        const order = orders.find(o => o.id === orderId);
+        if (order) {
+            state.activeOrder = order;
+            renderTracking();
+        }
+    } catch (e) { console.error(e); }
+}
+
+// ─── SIGNALR ───
+async function connectHub() {
+    if (hubConnection) return;
+    hubConnection = new signalR.HubConnectionBuilder()
+        .withUrl(API_URL.replace('/api', '/orderhub'), {
+            accessTokenFactory: () => state.authToken
+        })
+        .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
+        .build();
+
+    hubConnection.on('StatusUpdated', (data) => {
+        if (state.activeOrder && data.orderId === state.activeOrder.id) {
+            state.activeOrder.status = data.status;
+            renderTracking();
+
+            if (data.status === 'Delivered') {
+                showToast('🎉 Your order has been delivered!');
+                state.cart = [];
+                updateCartBadge();
+                setTimeout(() => {
+                    state.activeOrder = null;
+                    clearMapMarkers();
+                    goHome();
+                }, 3000);
+            }
+        }
+    });
+
+    hubConnection.on('DriverLocationUpdated', (data) => {
+        if (state.activeOrder && data.orderId === state.activeOrder.id) {
+            updateDriverMarker(data.lat, data.lng);
+        }
+    });
+
+    hubConnection.onreconnecting(() => showToast('Reconnecting...'));
+    hubConnection.onreconnected(() => {
+        showToast('Connected');
+        if (state.activeOrder) {
+            hubConnection.invoke('JoinOrder', state.activeOrder.id).catch(() => {});
+        }
+    });
+
+    try {
+        await hubConnection.start();
+    } catch (e) {
+        console.error('Hub connection failed:', e);
+    }
+}
+
+// ─── TRACKING MAP ───
+function initTracking() {
+    if (!state.activeOrder) {
+        document.getElementById('viewTracking').querySelector('.tracking-panel').innerHTML = `
+            <div class="empty-state" style="padding:2rem;">
+                <span class="empty-icon">📦</span>
+                <h3>No active delivery</h3>
+                <p>Place an order to start tracking</p>
+                <button class="btn-primary" style="margin-top:1rem;padding:0.75rem 2rem;width:auto;" onclick="goHome()">Browse Restaurants</button>
+            </div>
+        `;
+        return;
+    }
+
+    if (!trackingMap) {
+        trackingMap = L.map('trackingMap', { zoomControl: false }).setView(KAGISO_CENTER, 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(trackingMap);
+    }
+
+    setTimeout(() => trackingMap.invalidateSize(), 200);
+    renderTracking();
+
+    if (hubConnection && hubConnection.state === 'Connected') {
+        hubConnection.invoke('JoinOrder', state.activeOrder.id).catch(() => {});
+    }
+}
+
+function renderTracking() {
+    const o = state.activeOrder;
+    if (!o) return;
+
+    // Status text
+    const statusLabels = {
+        'Paid': 'Order confirmed',
+        'Assigned': 'Driver on the way to restaurant',
+        'Preparing': 'Being prepared',
+        'PickedUp': 'Driver picked up your order',
+        'OutForDelivery': 'On the way to you',
+        'Delivered': 'Delivered!'
+    };
+
+    const statusEl = document.getElementById('trackingStatusText');
+    const orderIdEl = document.getElementById('trackingOrderId');
+    if (statusEl) statusEl.textContent = statusLabels[o.status] || o.status;
+    if (orderIdEl) orderIdEl.textContent = String(o.id).padStart(4, '0');
+
+    // Timeline
+    const statusOrder = ['Paid', 'Assigned', 'PickedUp', 'Delivered'];
+    const currentIdx = statusOrder.indexOf(o.status === 'Preparing' ? 'Assigned' : o.status === 'OutForDelivery' ? 'PickedUp' : o.status);
+
+    document.querySelectorAll('.timeline-step').forEach((step, idx) => {
+        step.classList.remove('completed', 'active');
+        if (idx < currentIdx) step.classList.add('completed');
+        if (idx === currentIdx) step.classList.add('active');
+    });
+
+    // Map markers
+    if (trackingMap) {
+        if (o.deliveryLatitude && o.deliveryLongitude && !state.markers.customer) {
+            state.markers.customer = L.marker([o.deliveryLatitude, o.deliveryLongitude], {
+                icon: L.divIcon({
+                    className: 'custom-pin',
+                    html: '<div style="background:#e85d2a;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3)">🏠</div>',
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16]
+                })
+            }).addTo(trackingMap).bindPopup('Your location');
+        }
+
+        if (o.merchant && !state.markers.merchant) {
+            state.markers.merchant = L.marker([o.merchant.latitude, o.merchant.longitude], {
+                icon: L.divIcon({
+                    className: 'custom-pin',
+                    html: '<div style="background:#22a45d;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3)">🏪</div>',
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16]
+                })
+            }).addTo(trackingMap).bindPopup(o.merchant.name);
+        }
+
+        // Fit bounds
+        const points = [];
+        if (state.markers.customer) points.push(state.markers.customer.getLatLng());
+        if (state.markers.merchant) points.push(state.markers.merchant.getLatLng());
+        if (state.markers.driver) points.push(state.markers.driver.getLatLng());
+        if (points.length >= 2) {
+            trackingMap.fitBounds(L.latLngBounds(points).pad(0.2));
+        }
+    }
+
+    // Driver card
+    const driverCard = document.getElementById('driverCard');
+    if (driverCard && o.driver) {
+        driverCard.classList.remove('hidden');
+        document.getElementById('driverCardName').textContent = o.driver.fullName || 'Your driver';
+        document.getElementById('driverCardStatus').textContent =
+            o.status === 'PickedUp' || o.status === 'OutForDelivery' ? 'Heading to you' : 'Heading to restaurant';
+        if (o.driver.phone) {
+            document.getElementById('driverCallBtn').href = `tel:${o.driver.phone}`;
+        }
+    }
+}
+
+function updateDriverMarker(lat, lng) {
+    if (!trackingMap) return;
+
+    const driverCard = document.getElementById('driverCard');
+    if (driverCard) driverCard.classList.remove('hidden');
+
+    if (!state.markers.driver) {
+        state.markers.driver = L.marker([lat, lng], {
+            icon: L.divIcon({
+                className: 'custom-pin',
+                html: '<div style="background:#1a1a1a;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;border:3px solid white;box-shadow:0 2px 12px rgba(0,0,0,0.4)">🛵</div>',
+                iconSize: [36, 36],
+                iconAnchor: [18, 18]
+            })
+        }).addTo(trackingMap);
+    } else {
+        // Smooth animation
+        const current = state.markers.driver.getLatLng();
+        const steps = 20;
+        const latStep = (lat - current.lat) / steps;
+        const lngStep = (lng - current.lng) / steps;
+        let step = 0;
+        const animate = () => {
+            if (step >= steps) return;
+            step++;
+            state.markers.driver.setLatLng([
+                current.lat + latStep * step,
+                current.lng + lngStep * step
+            ]);
+            requestAnimationFrame(animate);
+        };
+        animate();
+    }
+}
+
+function clearMapMarkers() {
+    Object.values(state.markers).forEach(m => { if (m && trackingMap) trackingMap.removeLayer(m); });
+    state.markers = { merchant: null, customer: null, driver: null };
+}
+
+// ─── UTILITIES ───
+function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 2500);
+}
+
+function logout() {
+    localStorage.removeItem('ew_token');
+    localStorage.removeItem('ew_name');
+    state.authToken = null;
+    state.userName = null;
+    state.cart = [];
+    state.activeOrder = null;
+    if (hubConnection) hubConnection.stop();
+    location.reload();
+}
+
+// ─── BOOT ───
 init();

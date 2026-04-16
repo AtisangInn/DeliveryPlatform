@@ -1,97 +1,124 @@
-const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? 'http://localhost:5000/api' 
+/* ============================================
+   EASYWAY ADMIN DASHBOARD — JavaScript
+   Full CRUD, live map, SignalR events
+   ============================================ */
+
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:5000/api'
     : 'https://deliveryplatform.onrender.com/api';
 
-// --- PLATFORM STATE ---
+const KAGISO_CENTER = [-26.155, 27.778];
+
+// ─── STATE ───
 let state = {
-    authToken: localStorage.getItem('nexus_token'),
-    adminName: localStorage.getItem('nexus_admin'),
-    activeView: 'dashboard',
+    authToken: localStorage.getItem('ew_admin_token'),
+    adminName: localStorage.getItem('ew_admin_name'),
     merchants: [],
     orders: [],
+    drivers: [],
     feed: [],
-    markers: {
-        merchants: {},
-        drivers: {},
-        customers: {}
-    }
+    mapMarkers: { merchants: {}, drivers: {}, customers: {} },
+    orderFilter: 'all'
 };
 
 let hubConnection = null;
 let adminMap = null;
 
-// --- INITIALIZATION ---
-async function init() {
-    setupEventListeners();
+// ─── INIT ───
+function init() {
     if (state.authToken) {
         showApp();
     } else {
-        showLogin();
+        showAuth();
     }
+    document.getElementById('loginForm').addEventListener('submit', handleLogin);
 }
 
-function showLogin() {
-    document.getElementById('loginView').classList.remove('hidden');
-    document.getElementById('appView').classList.add('hidden');
+function showAuth() {
+    document.getElementById('authScreen').classList.add('active-screen');
+    document.getElementById('appShell').classList.add('hidden');
 }
 
-async function showApp() {
-    document.getElementById('loginView').classList.add('hidden');
-    document.getElementById('appView').classList.remove('hidden');
-    
+function showApp() {
+    document.getElementById('authScreen').classList.remove('active-screen');
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('appShell').classList.remove('hidden');
+
     initMap();
-    await connectHub();
-    await refreshData();
+    connectHub();
+    refreshAll();
 }
 
-function initMap() {
-    if (adminMap) return;
-    adminMap = L.map('adminMap', { zoomControl: false }).setView([-26.175, 27.882], 13);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap'
-    }).addTo(adminMap);
-}
-
-// --- NETWORK & HUB ---
-async function connectHub() {
-    if (hubConnection) return;
-    
-    hubConnection = new signalR.HubConnectionBuilder()
-        .withUrl(API_URL.replace('/api', '/orderhub'), {
-            accessTokenFactory: () => state.authToken
-        })
-        .withAutomaticReconnect()
-        .build();
-
-    hubConnection.on("StatusUpdated", (data) => {
-        logEvent(`[SIGNAL] Order #${data.orderId} transition: ${data.status}`);
-        refreshData();
-    });
-
-    hubConnection.on("DriverLocationUpdated", (data) => {
-        updateDriverMarker(data);
-    });
+// ─── AUTH ───
+async function handleLogin(e) {
+    e.preventDefault();
+    const btn = document.getElementById('loginBtn');
+    const errEl = document.getElementById('authError');
+    errEl.classList.add('hidden');
+    btn.disabled = true;
+    btn.textContent = 'Connecting...';
 
     try {
-        await hubConnection.start();
-        logEvent("Gateway: Secure telemetry established");
+        const res = await fetch(`${API_URL}/Auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: document.getElementById('email').value.trim(),
+                password: document.getElementById('password').value
+            })
+        });
+
+        if (!res.ok) throw new Error('Invalid credentials');
+        const data = await res.json();
+
+        if (data.role && data.role !== 'Admin') {
+            throw new Error('Admin access required');
+        }
+
+        state.authToken = data.token;
+        state.adminName = data.fullName;
+        localStorage.setItem('ew_admin_token', data.token);
+        localStorage.setItem('ew_admin_name', data.fullName);
+
+        showApp();
     } catch (err) {
-        logEvent("Gateway Error: Connection failed");
-        console.error(err);
+        errEl.textContent = err.message;
+        errEl.classList.remove('hidden');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
     }
 }
 
-async function refreshData() {
+// ─── NAVIGATION ───
+function switchPage(pageId, btn) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active-page'));
+    document.getElementById('page' + pageId.charAt(0).toUpperCase() + pageId.slice(1))?.classList.add('active-page');
+
+    document.querySelectorAll('.sidebar-link').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+
+    if (pageId === 'orders') renderOrders();
+    if (pageId === 'merchants') renderMerchants();
+    if (pageId === 'drivers') renderDrivers();
+    if (pageId === 'dashboard') { renderKPIs(); updateMapPoints(); }
+}
+
+// ─── DATA LOADING ───
+async function refreshAll() {
     try {
-        const [mRes, oRes] = await Promise.all([
+        const [merchants, orders] = await Promise.all([
             apiGet('Merchant'),
             apiGet('Order')
         ]);
-        state.merchants = mRes;
-        state.orders = oRes;
-        render();
+        state.merchants = merchants || [];
+        state.orders = orders || [];
+        renderKPIs();
+        updateMapPoints();
+        logEvent('Dashboard synced');
     } catch (e) {
-        console.error("Sync Error", e);
+        console.error('Refresh failed:', e);
+        logEvent('Sync error: ' + e.message);
     }
 }
 
@@ -99,187 +126,464 @@ async function apiGet(endpoint) {
     const res = await fetch(`${API_URL}/${endpoint}`, {
         headers: { 'Authorization': `Bearer ${state.authToken}` }
     });
-    if(res.status === 401) logout();
+    if (res.status === 401) return logout();
     return await res.json();
 }
 
-// --- RENDERING ENGINE ---
-function render() {
-    renderStats();
-    renderFeed();
+async function apiPost(endpoint, body) {
+    const res = await fetch(`${API_URL}/${endpoint}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${state.authToken}`
+        },
+        body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || 'Request failed');
+    }
+    return res;
+}
+
+// ─── SIGNALR ───
+async function connectHub() {
+    if (hubConnection) return;
+
+    hubConnection = new signalR.HubConnectionBuilder()
+        .withUrl(API_URL.replace('/api', '/orderhub'), {
+            accessTokenFactory: () => state.authToken
+        })
+        .withAutomaticReconnect([0, 2000, 5000, 10000])
+        .build();
+
+    hubConnection.on('StatusUpdated', (data) => {
+        logEvent(`Order #${data.orderId} → ${data.status}`);
+        refreshAll();
+    });
+
+    hubConnection.on('NewOrderAvailable', (data) => {
+        logEvent(`🆕 New order from ${data.merchantName || 'restaurant'}`);
+        refreshAll();
+    });
+
+    hubConnection.on('DriverLocationUpdated', (data) => {
+        updateDriverMapMarker(data);
+    });
+
+    hubConnection.onreconnecting(() => {
+        document.getElementById('hubStatus').textContent = 'Reconnecting...';
+    });
+
+    hubConnection.onreconnected(() => {
+        document.getElementById('hubStatus').textContent = 'Live';
+        logEvent('Connection restored');
+    });
+
+    try {
+        await hubConnection.start();
+        document.getElementById('hubStatus').textContent = 'Live';
+        logEvent('Real-time connection established');
+    } catch (e) {
+        document.getElementById('hubStatus').textContent = 'Offline';
+        logEvent('Connection failed');
+        console.error('Hub error:', e);
+    }
+}
+
+// ─── MAP ───
+function initMap() {
+    if (adminMap) return;
+    adminMap = L.map('adminMap', { zoomControl: false }).setView(KAGISO_CENTER, 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(adminMap);
+
+    setTimeout(() => adminMap.invalidateSize(), 300);
+}
+
+function updateMapPoints() {
+    if (!adminMap) return;
+
+    // Merchants
+    state.merchants.forEach(m => {
+        if (!state.mapMarkers.merchants[m.id] && m.latitude && m.longitude) {
+            state.mapMarkers.merchants[m.id] = L.marker([m.latitude, m.longitude], {
+                icon: L.divIcon({
+                    className: 'map-pin',
+                    html: '<div style="background:#22c55e;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3)">🏪</div>',
+                    iconSize: [28, 28], iconAnchor: [14, 14]
+                })
+            }).addTo(adminMap).bindPopup(`<b>${m.name}</b><br>${m.category}`);
+        }
+    });
+
+    // Active order customers
+    state.orders.filter(o => !['Delivered', 'PaymentFailed', 'Cancelled'].includes(o.status)).forEach(o => {
+        if (!state.mapMarkers.customers[o.id] && o.deliveryLatitude && o.deliveryLongitude) {
+            state.mapMarkers.customers[o.id] = L.marker([o.deliveryLatitude, o.deliveryLongitude], {
+                icon: L.divIcon({
+                    className: 'map-pin',
+                    html: '<div style="background:#ff6b2c;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3)">🏠</div>',
+                    iconSize: [24, 24], iconAnchor: [12, 12]
+                })
+            }).addTo(adminMap).bindPopup(`Order #${o.id}<br>${o.deliveryAddress || ''}`);
+        }
+    });
+}
+
+function updateDriverMapMarker(data) {
+    const { orderId, lat, lng } = data;
+    if (!adminMap) return;
+
+    if (!state.mapMarkers.drivers[orderId]) {
+        state.mapMarkers.drivers[orderId] = L.marker([lat, lng], {
+            icon: L.divIcon({
+                className: 'map-pin',
+                html: '<div style="background:#1a1a1a;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4)">🛵</div>',
+                iconSize: [30, 30], iconAnchor: [15, 15]
+            })
+        }).addTo(adminMap).bindPopup(`Driver (Order #${orderId})`);
+    } else {
+        state.mapMarkers.drivers[orderId].setLatLng([lat, lng]);
+    }
+}
+
+// ─── KPIs ───
+function renderKPIs() {
+    const delivered = state.orders.filter(o => o.status === 'Delivered');
+    const active = state.orders.filter(o => !['Delivered', 'PaymentFailed', 'Cancelled', 'Pending'].includes(o.status));
+    const revenue = delivered.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+
+    document.getElementById('kpiRevenue').textContent = `R${revenue.toFixed(2)}`;
+    document.getElementById('kpiActiveOrders').textContent = active.length;
+    document.getElementById('kpiCompleted').textContent = delivered.length;
+    document.getElementById('kpiDrivers').textContent = state.merchants.length; // placeholder
+}
+
+// ─── ORDERS PAGE ───
+function filterOrders(status, btn) {
+    state.orderFilter = status;
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    if (btn) btn.classList.add('active');
     renderOrders();
-    renderMerchants();
-    updateMapPoints();
-}
-
-function renderStats() {
-    const totalRev = state.orders
-        .filter(o => o.status === 'Delivered')
-        .reduce((sum, o) => sum + o.totalAmount, 0);
-    
-    document.getElementById('statRevenue').textContent = `R${totalRev.toFixed(2)}`;
-    document.getElementById('statOrders').textContent = state.orders.filter(o => o.status !== 'Delivered').length;
-}
-
-function renderFeed() {
-    const list = document.getElementById('liveFeed');
-    if (state.feed.length === 0) return;
-    
-    list.innerHTML = state.feed.map(item => `
-        <div class="feed-item">
-            <span class="feed-time">${item.time}</span>
-            <div>${item.msg}</div>
-        </div>
-    `).join('');
 }
 
 function renderOrders() {
-    const list = document.getElementById('activeOrdersList');
-    const active = state.orders.filter(o => o.status !== 'Delivered');
-    
-    list.innerHTML = active.map(o => `
-        <div class="order-card" onclick="focusOrder(${o.id})">
-            <span class="order-badge ${o.status.toLowerCase()}">${o.status}</span>
-            <div class="order-main">
-                <h4>#${o.id} - ${o.merchant?.name || 'Store'}</h4>
-                <p>${o.deliveryAddress}</p>
+    const container = document.getElementById('ordersTable');
+    let filtered = state.orders;
+
+    if (state.orderFilter !== 'all') {
+        filtered = filtered.filter(o => o.status === state.orderFilter);
+    }
+
+    filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<div class="feed-empty" style="padding:3rem;">No orders found</div>';
+        return;
+    }
+
+    container.innerHTML = filtered.map(o => {
+        const statusClass = 'status-' + o.status.toLowerCase();
+        const date = new Date(o.createdAt).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        return `
+            <div class="table-row">
+                <span class="table-id">#${o.id}</span>
+                <div class="table-cell">
+                    <h4>${o.merchant?.name || 'Restaurant'}</h4>
+                    <p>${o.deliveryAddress ? o.deliveryAddress.split(',').slice(0, 2).join(',') : 'N/A'}</p>
+                </div>
+                <div class="table-cell">
+                    <h4>${o.customer?.fullName || 'Customer'}</h4>
+                    <p>${date}</p>
+                </div>
+                <div class="table-cell">
+                    <span class="status-badge ${statusClass}">${o.status}</span>
+                </div>
+                <span class="table-amount">R${(o.totalAmount || 0).toFixed(2)}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+// ─── MERCHANTS PAGE ───
+function renderMerchants() {
+    const grid = document.getElementById('merchantsGrid');
+
+    if (state.merchants.length === 0) {
+        grid.innerHTML = '<div class="feed-empty" style="padding:3rem;">No merchants yet. Add your first!</div>';
+        return;
+    }
+
+    grid.innerHTML = state.merchants.map(m => `
+        <div class="merchant-admin-card">
+            <div class="merchant-admin-top">
+                <h3>${m.name}</h3>
+                <span class="merchant-status ${m.isActive ? 'active' : 'inactive'}">${m.isActive ? 'Active' : 'Inactive'}</span>
+            </div>
+            <div class="merchant-admin-meta">
+                <span>📂 ${m.category}</span>
+                <span>📍 ${m.address}</span>
+                <span>💰 ${m.commissionPercentage}% commission</span>
+            </div>
+            <div class="merchant-admin-actions">
+                <button class="btn-sm" onclick="openMenuModal(${m.id})">📋 Menu Items</button>
+                <button class="btn-sm" onclick="toggleMerchant(${m.id}, ${!m.isActive})">${m.isActive ? '⏸️ Pause' : '▶️ Activate'}</button>
             </div>
         </div>
     `).join('');
 }
 
-function renderMerchants() {
-    const list = document.getElementById('merchantList');
-    list.innerHTML = state.merchants.map(m => `
-        <div class="feed-item" style="display:flex; justify-content:space-between; align-items:center;">
-            <span>${m.name}</span>
-            <span class="status-indicator live" style="font-size:0.5rem">${m.isActive ? 'ONLINE' : 'OFFLINE'}</span>
+async function handleAddMerchant(e) {
+    e.preventDefault();
+
+    const name = document.getElementById('m_name').value.trim();
+    const address = document.getElementById('m_address').value.trim();
+
+    // Geocode address
+    let lat = KAGISO_CENTER[0], lng = KAGISO_CENTER[1];
+    try {
+        const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Kagiso, South Africa')}&limit=1`);
+        const geoData = await geoRes.json();
+        if (geoData.length > 0) {
+            lat = parseFloat(geoData[0].lat);
+            lng = parseFloat(geoData[0].lon);
+        }
+    } catch (e) { /* use defaults */ }
+
+    const payload = {
+        name,
+        category: document.getElementById('m_category').value,
+        address,
+        latitude: lat,
+        longitude: lng,
+        commissionPercentage: parseFloat(document.getElementById('m_commission').value) || 10,
+        isActive: true
+    };
+
+    try {
+        await apiPost('Merchant', payload);
+        closeModal('merchantModal');
+        showToast('Merchant added successfully');
+        state.merchants = await apiGet('Merchant');
+        renderMerchants();
+        updateMapPoints();
+        document.getElementById('merchantForm').reset();
+    } catch (e) {
+        showToast('Error: ' + e.message);
+    }
+}
+
+async function toggleMerchant(id, newStatus) {
+    try {
+        const merchant = state.merchants.find(m => m.id === id);
+        if (!merchant) return;
+        merchant.isActive = newStatus;
+
+        await fetch(`${API_URL}/Merchant/${id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.authToken}`
+            },
+            body: JSON.stringify(merchant)
+        });
+
+        showToast(`${merchant.name} ${newStatus ? 'activated' : 'paused'}`);
+        state.merchants = await apiGet('Merchant');
+        renderMerchants();
+    } catch (e) {
+        showToast('Error updating merchant');
+    }
+}
+
+// ─── MENU ITEM MANAGEMENT ───
+let currentMenuMerchantId = null;
+
+async function openMenuModal(merchantId) {
+    currentMenuMerchantId = merchantId;
+    document.getElementById('mi_merchantId').value = merchantId;
+
+    const merchant = state.merchants.find(m => m.id === merchantId);
+    document.getElementById('menuModalTitle').textContent = `Menu — ${merchant?.name || 'Merchant'}`;
+
+    // Fetch full merchant with items
+    try {
+        const res = await fetch(`${API_URL}/Merchant/${merchantId}`, {
+            headers: { 'Authorization': `Bearer ${state.authToken}` }
+        });
+        const full = await res.json();
+        renderMenuItems(full.menuItems || []);
+    } catch (e) {
+        renderMenuItems([]);
+    }
+
+    openModal('menuModal');
+}
+
+function renderMenuItems(items) {
+    const list = document.getElementById('menuItemsList');
+    if (items.length === 0) {
+        list.innerHTML = '<div class="feed-empty" style="padding:1rem;">No menu items yet</div>';
+        return;
+    }
+
+    list.innerHTML = items.map(item => `
+        <div class="menu-admin-item">
+            <div>
+                <strong>${item.name}</strong>
+                <span class="item-cat"> • ${item.category || 'Uncategorized'}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+                <span class="item-price">R${item.price.toFixed(2)}</span>
+                <button class="delete-btn" onclick="deleteMenuItem(${item.id})">✕</button>
+            </div>
         </div>
     `).join('');
 }
 
-function updateMapPoints() {
-    // 1. Merchants
-    state.merchants.forEach(m => {
-        if (!state.markers.merchants[m.id]) {
-            state.markers.merchants[m.id] = L.marker([m.latitude, m.longitude], {
-                icon: L.divIcon({ className: 'nexus-pin pin-merchant' })
-            }).addTo(adminMap).bindPopup(`<b>${m.name}</b>`);
-        }
-    });
+async function handleAddMenuItem(e) {
+    e.preventDefault();
+    const merchantId = parseInt(document.getElementById('mi_merchantId').value);
 
-    // 2. Customers for active orders
-    state.orders.filter(o => o.status !== 'Delivered').forEach(o => {
-        if (!state.markers.customers[o.id]) {
-            state.markers.customers[o.id] = L.marker([o.deliveryLatitude, o.deliveryLongitude], {
-                icon: L.divIcon({ className: 'nexus-pin pin-customer' })
-            }).addTo(adminMap).bindPopup(`Customer - Order #${o.id}`);
-        }
-    });
-}
+    const payload = {
+        merchantId,
+        name: document.getElementById('mi_name').value.trim(),
+        price: parseFloat(document.getElementById('mi_price').value),
+        category: document.getElementById('mi_category').value.trim() || 'General',
+        description: document.getElementById('mi_desc').value.trim(),
+        isAvailable: true
+    };
 
-function updateDriverMarker(data) {
-    const { orderId, lat, lng } = data;
-    if (!state.markers.drivers[orderId]) {
-        state.markers.drivers[orderId] = L.marker([lat, lng], {
-            icon: L.divIcon({ className: 'nexus-pin pin-driver' })
-        }).addTo(adminMap).bindPopup(`Driver - Order #${orderId}`);
-    } else {
-        state.markers.drivers[orderId].setLatLng([lat, lng]);
+    try {
+        await apiPost(`Merchant/${merchantId}/menu`, payload);
+        showToast('Menu item added');
+        document.getElementById('menuItemForm').reset();
+        document.getElementById('mi_merchantId').value = merchantId;
+        openMenuModal(merchantId); // Refresh
+    } catch (e) {
+        showToast('Error: ' + e.message);
     }
 }
 
-// --- UTILS ---
+async function deleteMenuItem(itemId) {
+    if (!confirm('Remove this menu item?')) return;
+    try {
+        await fetch(`${API_URL}/Merchant/${currentMenuMerchantId}/menu/${itemId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${state.authToken}` }
+        });
+        showToast('Item removed');
+        openMenuModal(currentMenuMerchantId);
+    } catch (e) {
+        showToast('Error removing item');
+    }
+}
+
+// ─── DRIVERS PAGE ───
+function renderDrivers() {
+    // We'll load drivers from the orders data (drivers who've accepted orders) 
+    // and any we can fetch. For now show from orders.
+    const driverMap = {};
+    state.orders.forEach(o => {
+        if (o.driver && !driverMap[o.driver.id]) {
+            driverMap[o.driver.id] = o.driver;
+        }
+    });
+
+    const drivers = Object.values(driverMap);
+    const grid = document.getElementById('driversGrid');
+
+    if (drivers.length === 0) {
+        grid.innerHTML = '<div class="feed-empty" style="padding:3rem;">No drivers registered yet. Use the button above to add one.</div>';
+        return;
+    }
+
+    grid.innerHTML = drivers.map(d => `
+        <div class="driver-admin-card">
+            <div class="driver-admin-top">
+                <div class="driver-admin-avatar">🛵</div>
+                <div class="driver-admin-name">
+                    <h3>${d.fullName || 'Driver'}</h3>
+                    <span>${d.email || ''}</span>
+                </div>
+            </div>
+            <div class="driver-admin-meta">
+                <span>📱 ${d.phone || 'N/A'}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function handleAddDriver(e) {
+    e.preventDefault();
+
+    const payload = {
+        fullName: document.getElementById('d_name').value.trim(),
+        email: document.getElementById('d_email').value.trim(),
+        password: document.getElementById('d_password').value,
+        phone: document.getElementById('d_phone').value.trim(),
+        role: 'Driver'
+    };
+
+    try {
+        await apiPost('Auth/register', payload);
+        showToast('Driver registered successfully');
+        closeModal('driverModal');
+        document.getElementById('driverForm').reset();
+        logEvent(`New driver: ${payload.fullName}`);
+    } catch (e) {
+        showToast('Error: ' + e.message);
+    }
+}
+
+// ─── ACTIVITY FEED ───
 function logEvent(msg) {
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const time = new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     state.feed.unshift({ time, msg });
-    if(state.feed.length > 50) state.feed.pop();
+    if (state.feed.length > 50) state.feed.pop();
     renderFeed();
 }
 
-function setupEventListeners() {
-    // Auth
-    document.getElementById('loginForm').addEventListener('submit', handleLogin);
-    document.getElementById('logoutBtn').addEventListener('click', logout);
-    
-    // Tabs
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-            
-            btn.classList.add('active');
-            const tab = btn.getAttribute('data-tab');
-            document.getElementById(`tab-${tab}`).classList.remove('hidden');
-        });
-    });
-
-    // Modal
-    document.getElementById('addMerchantBtn').addEventListener('click', () => document.getElementById('merchantModal').classList.remove('hidden'));
-    document.getElementById('closeModalBtn').addEventListener('click', () => document.getElementById('merchantModal').classList.add('hidden'));
-    document.getElementById('merchantForm').addEventListener('submit', handleAddMerchant);
-}
-
-async function handleLogin(e) {
-    e.preventDefault();
-    const btn = document.getElementById('loginBtn');
-    btn.textContent = 'CONNECTING...';
-    
-    try {
-        const res = await fetch(`${API_URL}/Auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                email: document.getElementById('email').value,
-                password: document.getElementById('password').value
-            })
-        });
-        
-        if (!res.ok) throw new Error('Access Denied');
-        const data = await res.json();
-        
-        state.authToken = data.token;
-        state.adminName = data.fullName;
-        localStorage.setItem('nexus_token', data.token);
-        localStorage.setItem('nexus_admin', data.fullName);
-        
-        showApp();
-    } catch (err) {
-        document.getElementById('loginError').classList.remove('hidden');
-    } finally {
-        btn.textContent = 'INITIALIZE CONNECTION';
+function renderFeed() {
+    const container = document.getElementById('eventFeed');
+    if (state.feed.length === 0) {
+        container.innerHTML = '<div class="feed-empty">No activity yet</div>';
+        return;
     }
+
+    container.innerHTML = state.feed.map(f => `
+        <div class="feed-item">
+            <span class="feed-time">${f.time}</span>
+            <span class="feed-msg">${f.msg}</span>
+        </div>
+    `).join('');
 }
 
-async function handleAddMerchant(e) {
-    e.preventDefault();
-    const payload = {
-        name: document.getElementById('m_name').value,
-        category: document.getElementById('m_category').value,
-        address: document.getElementById('m_address').value,
-        commissionPercentage: parseFloat(document.getElementById('m_commission').value),
-        isActive: true
-    };
-    
-    try {
-        const res = await fetch(`${API_URL}/Merchant`, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${state.authToken}`
-            },
-            body: JSON.stringify(payload)
-        });
-        if(res.ok) {
-            document.getElementById('merchantModal').classList.add('hidden');
-            refreshData();
-        }
-    } catch (e) { alert("Deployment error"); }
+// ─── MODALS ───
+function openModal(id) {
+    document.getElementById(id).classList.remove('hidden');
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.add('hidden');
+}
+
+// ─── UTILITIES ───
+function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 3000);
 }
 
 function logout() {
-    localStorage.clear();
+    localStorage.removeItem('ew_admin_token');
+    localStorage.removeItem('ew_admin_name');
+    if (hubConnection) hubConnection.stop();
     location.reload();
 }
 
+// ─── BOOT ───
 init();

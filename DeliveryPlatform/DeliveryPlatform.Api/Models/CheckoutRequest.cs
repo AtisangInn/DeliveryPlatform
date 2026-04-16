@@ -4,6 +4,8 @@ public class CheckoutRequest
 {
     public int MerchantId { get; set; }
     public string DeliveryAddress { get; set; } = string.Empty;
+    public double DeliveryLatitude { get; set; }
+    public double DeliveryLongitude { get; set; }
     public List<CheckoutItem> Items { get; set; } = new();
 }
 

@@ -3,123 +3,256 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nexus Command - Master Hub</title>
+    <title>Easyway Admin — Command Center</title>
+    <meta name="description" content="Easyway Deliveries admin dashboard — manage merchants, drivers, orders, and operations.">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
-<body class="admin-body">
+<body>
 
-    <!-- Auth Layer -->
-    <div id="loginView" class="auth-container">
+    <!-- ============ AUTH ============ -->
+    <div id="authScreen" class="auth-screen active-screen">
         <div class="auth-card">
-            <div class="auth-header">
-                <div class="logo-orb">N</div>
-                <h1>Nexus Command</h1>
-                <p>Authorized Personnel Only</p>
+            <div class="auth-brand">
+                <div class="brand-icon">⚡</div>
+                <h1>Easyway</h1>
+                <p>Admin Dashboard</p>
             </div>
             <form id="loginForm">
                 <div class="input-group">
-                    <label>Terminal ID (Email)</label>
-                    <input type="email" id="email" placeholder="admin@nexus.io" required>
+                    <label>Email</label>
+                    <input type="email" id="email" placeholder="admin@easyway.co.za" required>
                 </div>
                 <div class="input-group">
-                    <label>Security Key</label>
+                    <label>Password</label>
                     <input type="password" id="password" placeholder="••••••••" required>
                 </div>
-                <div id="loginError" class="error-msg hidden">Access Denied: Invalid Credentials</div>
-                <button type="submit" id="loginBtn" class="premium-btn">Initialize Connection</button>
+                <div id="authError" class="auth-error hidden"></div>
+                <button type="submit" id="loginBtn" class="btn-primary">Sign In</button>
             </form>
         </div>
     </div>
 
-    <!-- Command Suite -->
-    <div id="appView" class="app-layout hidden">
-        
-        <!-- Sidebar: Discovery & Intelligence -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <div class="status-indicator live">LIVE</div>
-                <h2>TELEMETRY</h2>
-            </div>
-            
-            <div class="stats-panel">
-                <div class="mini-stat">
-                    <label>Revenue</label>
-                    <span id="statRevenue">R0.00</span>
-                </div>
-                <div class="mini-stat">
-                    <label>Active</label>
-                    <span id="statOrders">0</span>
-                </div>
-            </div>
+    <!-- ============ DASHBOARD ============ -->
+    <div id="appShell" class="hidden">
+        <div class="app-layout">
 
-            <div class="feed-container">
-                <div class="feed-header">EVENT STREAM</div>
-                <div id="liveFeed" class="feed-list">
-                    <!-- Events injected here -->
-                    <div class="feed-empty">Listening for gateway signals...</div>
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-brand">
+                    <span class="sidebar-icon">⚡</span>
+                    <div>
+                        <h1>Easyway</h1>
+                        <span class="sidebar-role">Admin</span>
+                    </div>
                 </div>
-            </div>
 
-            <div class="sidebar-footer">
-                <button id="logoutBtn" class="text-btn">Terminate Session</button>
-            </div>
-        </aside>
+                <nav class="sidebar-nav">
+                    <button class="sidebar-link active" data-page="dashboard" onclick="switchPage('dashboard', this)">
+                        <span>📊</span> Dashboard
+                    </button>
+                    <button class="sidebar-link" data-page="orders" onclick="switchPage('orders', this)">
+                        <span>📋</span> Orders
+                    </button>
+                    <button class="sidebar-link" data-page="merchants" onclick="switchPage('merchants', this)">
+                        <span>🏪</span> Merchants
+                    </button>
+                    <button class="sidebar-link" data-page="drivers" onclick="switchPage('drivers', this)">
+                        <span>🛵</span> Drivers
+                    </button>
+                </nav>
 
-        <!-- Main: Tactical Map -->
-        <main class="tactical-map-container">
-            <div id="adminMap"></div>
-            <div class="map-overlay-top">
-                <div class="search-bar">
-                    <input type="text" placeholder="Search orders, drivers, merchants...">
+                <div class="sidebar-footer">
+                    <div class="live-indicator">
+                        <span class="live-dot"></span>
+                        <span id="hubStatus">Connecting...</span>
+                    </div>
+                    <button class="logout-btn" onclick="logout()">Logout</button>
                 </div>
-            </div>
-        </main>
+            </aside>
 
-        <!-- Right: Operations & Details -->
-        <section class="operations-panel">
-            <div class="ops-header">
-                <h2>OPERATIONS</h2>
-                <div class="tabs">
-                    <button class="tab-btn active" data-tab="active">ACTIVE</button>
-                    <button class="tab-btn" data-tab="merchants">MERCHANTS</button>
-                </div>
-            </div>
+            <!-- Main Content -->
+            <main class="main-content">
 
-            <div id="tab-active" class="tab-content">
-                <div id="activeOrdersList" class="order-grid">
-                    <!-- Order cards -->
-                </div>
-            </div>
+                <!-- ===== DASHBOARD PAGE ===== -->
+                <section id="pageDashboard" class="page active-page">
+                    <!-- KPI Cards -->
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <span class="kpi-icon">💰</span>
+                            <div>
+                                <span class="kpi-label">Revenue</span>
+                                <span class="kpi-value" id="kpiRevenue">R0.00</span>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <span class="kpi-icon">📦</span>
+                            <div>
+                                <span class="kpi-label">Active Orders</span>
+                                <span class="kpi-value" id="kpiActiveOrders">0</span>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <span class="kpi-icon">✅</span>
+                            <div>
+                                <span class="kpi-label">Completed</span>
+                                <span class="kpi-value" id="kpiCompleted">0</span>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <span class="kpi-icon">🛵</span>
+                            <div>
+                                <span class="kpi-label">Drivers</span>
+                                <span class="kpi-value" id="kpiDrivers">0</span>
+                            </div>
+                        </div>
+                    </div>
 
-            <div id="tab-merchants" class="tab-content hidden">
-                <div class="ops-actions">
-                    <button id="addMerchantBtn" class="action-btn">+ Register Merchant</button>
-                </div>
-                <div id="merchantList" class="merchant-list">
-                    <!-- Merchant entries -->
-                </div>
-            </div>
-        </section>
+                    <!-- Live Map -->
+                    <div class="dashboard-map-wrap">
+                        <h2 class="section-heading">Live Map</h2>
+                        <div id="adminMap" class="dashboard-map"></div>
+                    </div>
+
+                    <!-- Event Feed -->
+                    <div class="event-feed-wrap">
+                        <h2 class="section-heading">Activity Feed</h2>
+                        <div id="eventFeed" class="event-feed">
+                            <div class="feed-empty">No activity yet</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ===== ORDERS PAGE ===== -->
+                <section id="pageOrders" class="page">
+                    <div class="page-header">
+                        <h1>Orders</h1>
+                        <div class="filter-group">
+                            <button class="filter-chip active" onclick="filterOrders('all', this)">All</button>
+                            <button class="filter-chip" onclick="filterOrders('Paid', this)">Paid</button>
+                            <button class="filter-chip" onclick="filterOrders('Assigned', this)">Assigned</button>
+                            <button class="filter-chip" onclick="filterOrders('PickedUp', this)">Picked Up</button>
+                            <button class="filter-chip" onclick="filterOrders('Delivered', this)">Delivered</button>
+                        </div>
+                    </div>
+                    <div id="ordersTable" class="data-table">
+                        <!-- Orders rendered here -->
+                    </div>
+                </section>
+
+                <!-- ===== MERCHANTS PAGE ===== -->
+                <section id="pageMerchants" class="page">
+                    <div class="page-header">
+                        <h1>Merchants</h1>
+                        <button class="btn-accent" onclick="openModal('merchantModal')">+ Add Merchant</button>
+                    </div>
+                    <div id="merchantsGrid" class="merchants-grid">
+                        <!-- Merchant cards -->
+                    </div>
+                </section>
+
+                <!-- ===== DRIVERS PAGE ===== -->
+                <section id="pageDrivers" class="page">
+                    <div class="page-header">
+                        <h1>Drivers</h1>
+                        <button class="btn-accent" onclick="openModal('driverModal')">+ Add Driver</button>
+                    </div>
+                    <div id="driversGrid" class="drivers-grid">
+                        <!-- Driver cards -->
+                    </div>
+                </section>
+            </main>
+        </div>
     </div>
 
-    <!-- Dynamic Elements -->
+    <!-- ============ ADD MERCHANT MODAL ============ -->
     <div id="merchantModal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <h3>Register Merchant</h3>
-            <form id="merchantForm">
-                <input type="text" id="m_name" placeholder="Name" required>
-                <input type="text" id="m_category" placeholder="Category" required>
-                <input type="text" id="m_address" placeholder="Address" required>
-                <input type="number" id="m_commission" placeholder="Commission %" step="0.1" value="10.0">
-                <div class="modal-btns">
-                    <button type="button" id="closeModalBtn" class="cancel-btn">Cancel</button>
-                    <button type="submit" class="confirm-btn">Deploy</button>
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>Add Merchant</h2>
+                <button class="close-btn" onclick="closeModal('merchantModal')">✕</button>
+            </div>
+            <form id="merchantForm" onsubmit="handleAddMerchant(event)">
+                <div class="input-group"><label>Name</label><input type="text" id="m_name" required></div>
+                <div class="input-group"><label>Category</label>
+                    <select id="m_category" class="select-input">
+                        <option value="Fast Food">Fast Food</option>
+                        <option value="African Cuisine">African Cuisine</option>
+                        <option value="Pizza">Pizza</option>
+                        <option value="Drinks">Drinks</option>
+                        <option value="Desserts">Desserts</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="input-group"><label>Address</label><input type="text" id="m_address" required></div>
+                <div class="input-group"><label>Commission %</label><input type="number" id="m_commission" value="10" step="0.5" min="0" max="50"></div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" onclick="closeModal('merchantModal')">Cancel</button>
+                    <button type="submit" class="btn-accent">Add Merchant</button>
                 </div>
             </form>
         </div>
     </div>
+
+    <!-- ============ ADD DRIVER MODAL ============ -->
+    <div id="driverModal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>Add Driver</h2>
+                <button class="close-btn" onclick="closeModal('driverModal')">✕</button>
+            </div>
+            <form id="driverForm" onsubmit="handleAddDriver(event)">
+                <div class="input-group"><label>Full Name</label><input type="text" id="d_name" required></div>
+                <div class="input-group"><label>Email</label><input type="email" id="d_email" required></div>
+                <div class="input-group"><label>Phone</label><input type="tel" id="d_phone" required></div>
+                <div class="input-group"><label>Password</label><input type="password" id="d_password" required></div>
+                <div class="input-group"><label>Vehicle Type</label>
+                    <select id="d_vehicle" class="select-input">
+                        <option value="Motorbike">Motorbike</option>
+                        <option value="Car">Car</option>
+                        <option value="Bicycle">Bicycle</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" onclick="closeModal('driverModal')">Cancel</button>
+                    <button type="submit" class="btn-accent">Add Driver</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============ MENU ITEMS MODAL ============ -->
+    <div id="menuModal" class="modal-overlay hidden">
+        <div class="modal-card wide">
+            <div class="modal-header">
+                <h2 id="menuModalTitle">Menu Items</h2>
+                <button class="close-btn" onclick="closeModal('menuModal')">✕</button>
+            </div>
+            <div id="menuItemsList" class="menu-items-admin">
+                <!-- Items listed here -->
+            </div>
+            <div class="modal-divider"></div>
+            <h3 class="modal-section-title">Add Menu Item</h3>
+            <form id="menuItemForm" onsubmit="handleAddMenuItem(event)">
+                <input type="hidden" id="mi_merchantId">
+                <div class="form-row">
+                    <div class="input-group"><label>Item Name</label><input type="text" id="mi_name" required></div>
+                    <div class="input-group"><label>Price (R)</label><input type="number" id="mi_price" step="0.01" min="1" required></div>
+                </div>
+                <div class="form-row">
+                    <div class="input-group"><label>Category</label><input type="text" id="mi_category" placeholder="e.g. Kotas, Chips, Drinks"></div>
+                    <div class="input-group"><label>Description</label><input type="text" id="mi_desc"></div>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn-accent">Add Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast hidden"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
