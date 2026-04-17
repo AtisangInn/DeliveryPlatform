@@ -631,6 +631,29 @@ input, select { font-family: var(--font); }
     padding: 0.2rem 0.5rem;
 }
 
+/* Add Merchant Map Styling */
+.admin-merchant-map {
+    height: 180px;
+    width: 100%;
+    background: #111;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    margin-bottom: 0.5rem;
+    position: relative;
+    z-index: 100;
+}
+.admin-merchant-map::after {
+    content: '📍';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -100%);
+    font-size: 2rem;
+    z-index: 1000;
+    pointer-events: none;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+
 /* ======= TOAST ======= */
 .toast {
     position: fixed;

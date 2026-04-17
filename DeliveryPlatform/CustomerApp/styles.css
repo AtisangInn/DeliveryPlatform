@@ -1078,6 +1078,72 @@ a { color: var(--accent); text-decoration: none; }
     font-size: 1rem;
 }
 
+/* ======= MAP PICKER MODAL ======= */
+.map-sheet {
+    height: 90vh !important;
+    display: flex;
+    flex-direction: column;
+    padding: 0 !important;
+}
+
+.map-sheet .sheet-header {
+    padding: 1.5rem 1.5rem 1rem;
+    flex-shrink: 0;
+}
+
+.map-search-container {
+    padding: 0 1.5rem 1rem;
+    position: relative;
+    z-index: 1000;
+}
+
+.absolute-results {
+    position: absolute;
+    top: 100%;
+    left: 1.5rem;
+    right: 1.5rem;
+    z-index: 1001;
+    background: white;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+    border-radius: var(--radius-md);
+    max-height: 250px;
+}
+
+.location-picker-map {
+    flex: 1;
+    width: 100%;
+    background: #e5e5e5;
+    position: relative;
+    z-index: 1;
+}
+
+/* Center crosshair for dropping pin */
+.location-picker-map::after {
+    content: '📍';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -100%);
+    font-size: 2.5rem;
+    z-index: 1000;
+    pointer-events: none;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+    animation: dropIn 0.3s ease-out;
+}
+
+@keyframes dropIn {
+    from { transform: translate(-50%, -200%); opacity: 0; }
+    to { transform: translate(-50%, -100%); opacity: 1; }
+}
+
+.location-confirm-bar {
+    padding: 1.5rem;
+    background: var(--white);
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.05);
+    z-index: 10;
+}
+
 /* ======= TOAST ======= */
 .toast {
     position: fixed;

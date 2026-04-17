@@ -29,6 +29,7 @@ let state = {
 let hubConnection = null;
 let trackingMap = null;
 let addressTimer = null;
+let locationPickerMapInstance = null;
 
 // ─── INIT ───
 function init() {
@@ -494,7 +495,22 @@ function openAddressModal() {
     document.getElementById('addressModal').classList.remove('hidden');
     document.getElementById('modalAddressInput').value = '';
     document.getElementById('modalAddressResults').innerHTML = '';
-    setTimeout(() => document.getElementById('modalAddressInput').focus(), 300);
+    
+    // Initialize map if missing
+    if (!locationPickerMapInstance) {
+        locationPickerMapInstance = L.map('locationPickerMap', { zoomControl: false }).setView(
+            [state.deliveryLat || KAGISO_CENTER[0], state.deliveryLng || KAGISO_CENTER[1]], 16
+        );
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(locationPickerMapInstance);
+    } else {
+        locationPickerMapInstance.setView([state.deliveryLat || KAGISO_CENTER[0], state.deliveryLng || KAGISO_CENTER[1]], 16);
+    }
+
+    setTimeout(() => {
+        locationPickerMapInstance.invalidateSize();
+    }, 200);
 }
 
 function closeAddressModal() {
@@ -535,9 +551,50 @@ function searchAddressModal(query) {
 }
 
 function selectAddressModal(display, lat, lng) {
-    selectAddress(display, lat, lng);
-    closeAddressModal();
-    showToast('Delivery address updated');
+    document.getElementById('modalAddressInput').value = display;
+    document.getElementById('modalAddressResults').innerHTML = '';
+    if (locationPickerMapInstance) {
+        locationPickerMapInstance.setView([lat, lng], 18);
+    }
+}
+
+async function confirmMapPin() {
+    if (!locationPickerMapInstance) return;
+    const center = locationPickerMapInstance.getCenter();
+    const lat = center.lat;
+    const lng = center.lng;
+
+    showToast('Fetching address...');
+    const btn = document.getElementById('confirmLocationBtn');
+    btn.disabled = true;
+    btn.textContent = 'Confirming...';
+
+    const inputVal = document.getElementById('modalAddressInput').value.trim();
+
+    try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+        const data = await res.json();
+        
+        let display = "Pinned Location";
+        if (data && data.display_name) {
+            display = data.address.road ? `${data.address.road}` : data.display_name.split(',')[0];
+        }
+        
+        if (inputVal && inputVal.length >= 3) {
+            display = inputVal;
+        }
+
+        selectAddress(display, lat, lng);
+        closeAddressModal();
+        showToast('Delivery address updated');
+    } catch (e) {
+        selectAddress(inputVal || "Pinned Location", lat, lng);
+        closeAddressModal();
+        showToast('Delivery location set');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Confirm Pin Location';
+    }
 }
 
 // ─── CHECKOUT ───

@@ -23,6 +23,7 @@ let state = {
 
 let hubConnection = null;
 let adminMap = null;
+let adminMerchantPickerMap = null;
 
 // ─── INIT ───
 function init() {
@@ -340,25 +341,25 @@ async function handleAddMerchant(e) {
 
     const name = document.getElementById('m_name').value.trim();
     const address = document.getElementById('m_address').value.trim();
+    const category = document.getElementById('m_category').value;
+    const commission = parseFloat(document.getElementById('m_commission').value) || 10;
 
-    // Geocode address
-    let lat = KAGISO_CENTER[0], lng = KAGISO_CENTER[1];
-    try {
-        const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Kagiso, South Africa')}&limit=1`);
-        const geoData = await geoRes.json();
-        if (geoData.length > 0) {
-            lat = parseFloat(geoData[0].lat);
-            lng = parseFloat(geoData[0].lon);
-        }
-    } catch (e) { /* use defaults */ }
+    let lat = KAGISO_CENTER[0];
+    let lng = KAGISO_CENTER[1];
+
+    if (adminMerchantPickerMap) {
+        const center = adminMerchantPickerMap.getCenter();
+        lat = center.lat;
+        lng = center.lng;
+    }
 
     const payload = {
         name,
-        category: document.getElementById('m_category').value,
+        category,
         address,
         latitude: lat,
         longitude: lng,
-        commissionPercentage: parseFloat(document.getElementById('m_commission').value) || 10,
+        commissionPercentage: commission,
         isActive: true
     };
 
@@ -564,6 +565,16 @@ function renderFeed() {
 // ─── MODALS ───
 function openModal(id) {
     document.getElementById(id).classList.remove('hidden');
+    
+    if (id === 'merchantModal') {
+        if (!adminMerchantPickerMap) {
+            adminMerchantPickerMap = L.map('adminMerchantMap', { zoomControl: false }).setView(KAGISO_CENTER, 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(adminMerchantPickerMap);
+        }
+        setTimeout(() => adminMerchantPickerMap.invalidateSize(), 200);
+    }
 }
 
 function closeModal(id) {

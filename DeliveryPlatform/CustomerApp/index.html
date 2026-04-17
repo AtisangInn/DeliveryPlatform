@@ -264,19 +264,26 @@
 
     <!-- ============ ADDRESS PICKER MODAL ============ -->
     <div id="addressModal" class="sheet-overlay hidden" onclick="closeAddressModal()">
-        <div class="sheet" onclick="event.stopPropagation()">
+        <div class="sheet map-sheet" onclick="event.stopPropagation()">
             <div class="sheet-header">
-                <h2>Delivery Address</h2>
+                <h2>Set Location</h2>
                 <button class="close-btn" onclick="closeAddressModal()">✕</button>
             </div>
-            <div style="padding: 1.5rem;">
+            
+            <div class="map-search-container">
                 <div class="address-input-wrap">
                     <span class="address-pin">📍</span>
-                    <input type="text" id="modalAddressInput" placeholder="Search for your address..." autocomplete="off" oninput="searchAddressModal(this.value)">
+                    <input type="text" id="modalAddressInput" placeholder="Search or move pin..." autocomplete="off" oninput="searchAddressModal(this.value)">
                 </div>
-                <div id="modalAddressResults" class="address-dropdown-static">
-                    <!-- Address suggestions -->
-                </div>
+                <div id="modalAddressResults" class="address-dropdown-static absolute-results"></div>
+            </div>
+
+            <div id="locationPickerMap" class="location-picker-map"></div>
+            
+            <div class="location-confirm-bar">
+                <button id="confirmLocationBtn" class="btn-primary btn-lg" onclick="confirmMapPin()">
+                    Confirm Pin Location
+                </button>
             </div>
         </div>
     </div>
