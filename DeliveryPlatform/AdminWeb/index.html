@@ -111,7 +111,15 @@
 
                     <!-- Live Map -->
                     <div class="dashboard-map-wrap">
-                        <h2 class="section-heading">Live Map</h2>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <h2 class="section-heading" style="margin-bottom: 0;">Live Map</h2>
+                            <button class="btn-cancel clear-map-btn" onclick="clearSettledMapPins()">✨ Clear Settled Deliveries</button>
+                        </div>
+                        <div class="map-legend">
+                            <div class="legend-item"><span class="legend-icon" style="background:#22c55e;">🏪</span> <span>Restaurant</span></div>
+                            <div class="legend-item"><span class="legend-icon" style="background:#ff6b2c;">🏠</span> <span>Customer</span></div>
+                            <div class="legend-item"><span class="legend-icon" style="background:#1a1a1a;">🛵</span> <span>Active Driver</span></div>
+                        </div>
                         <div id="adminMap" class="dashboard-map"></div>
                     </div>
 

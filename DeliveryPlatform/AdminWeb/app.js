@@ -220,15 +220,30 @@ function updateMapPoints() {
     });
 
     // Active order customers
-    state.orders.filter(o => !['Delivered', 'PaymentFailed', 'Cancelled'].includes(o.status)).forEach(o => {
-        if (!state.mapMarkers.customers[o.id] && o.deliveryLatitude && o.deliveryLongitude) {
-            state.mapMarkers.customers[o.id] = L.marker([o.deliveryLatitude, o.deliveryLongitude], {
-                icon: L.divIcon({
-                    className: 'map-pin',
-                    html: '<div style="background:#ff6b2c;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3)">🏠</div>',
-                    iconSize: [24, 24], iconAnchor: [12, 12]
-                })
-            }).addTo(adminMap).bindPopup(`Order #${o.id}<br>${o.deliveryAddress || ''}`);
+    state.orders.forEach(o => {
+        const isSettled = ['Delivered', 'PaymentFailed', 'Cancelled'].includes(o.status);
+
+        if (isSettled) {
+            // Prune if exists
+            if (state.mapMarkers.customers[o.id]) {
+                adminMap.removeLayer(state.mapMarkers.customers[o.id]);
+                delete state.mapMarkers.customers[o.id];
+            }
+            if (state.mapMarkers.drivers[o.id]) {
+                adminMap.removeLayer(state.mapMarkers.drivers[o.id]);
+                delete state.mapMarkers.drivers[o.id];
+            }
+        } else {
+            // Add or keep active
+            if (!state.mapMarkers.customers[o.id] && o.deliveryLatitude && o.deliveryLongitude) {
+                state.mapMarkers.customers[o.id] = L.marker([o.deliveryLatitude, o.deliveryLongitude], {
+                    icon: L.divIcon({
+                        className: 'map-pin',
+                        html: '<div style="background:#ff6b2c;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3)">🏠</div>',
+                        iconSize: [24, 24], iconAnchor: [12, 12]
+                    })
+                }).addTo(adminMap).bindPopup(`Order #${o.id}<br>${o.deliveryAddress || ''}`);
+            }
         }
     });
 }
@@ -248,6 +263,11 @@ function updateDriverMapMarker(data) {
     } else {
         state.mapMarkers.drivers[orderId].setLatLng([lat, lng]);
     }
+}
+
+function clearSettledMapPins() {
+    updateMapPoints(); // Running this now auto-prunes
+    showToast('Map cleaned of settled deliveries');
 }
 
 // ─── KPIs ───
