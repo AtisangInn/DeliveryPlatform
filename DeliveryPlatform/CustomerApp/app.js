@@ -454,7 +454,12 @@ function searchAddress(query) {
             );
             const data = await res.json();
             if (data.length === 0) {
-                results.innerHTML = '<div class="address-option" style="color:var(--text-muted)">No addresses found</div>';
+                results.innerHTML = `
+                    <div class="address-option" style="color:var(--text-muted)">No exact map matches</div>
+                    <div class="address-option" style="color:var(--accent); font-weight:600;" onclick="selectAddress('${query.replace(/'/g, "\\'")}', state.deliveryLat || ${KAGISO_CENTER[0]}, state.deliveryLng || ${KAGISO_CENTER[1]})">
+                        📍 Use "${query}" anyway
+                    </div>
+                `;
             } else {
                 results.innerHTML = data.map(a => `
                     <div class="address-option" onclick="selectAddress('${a.display_name.replace(/'/g, "\\'")}', ${a.lat}, ${a.lon})">
@@ -511,13 +516,20 @@ function searchAddressModal(query) {
                 { headers: { 'Accept-Language': 'en' } }
             );
             const data = await res.json();
-            results.innerHTML = data.length === 0
-                ? '<div class="address-option" style="color:var(--text-muted)">No addresses found</div>'
-                : data.map(a => `
+            if (data.length === 0) {
+                results.innerHTML = `
+                    <div class="address-option" style="color:var(--text-muted)">No exact map matches</div>
+                    <div class="address-option" style="color:var(--accent); font-weight:600;" onclick="selectAddressModal('${query.replace(/'/g, "\\'")}', state.deliveryLat || ${KAGISO_CENTER[0]}, state.deliveryLng || ${KAGISO_CENTER[1]})">
+                        📍 Use "${query}" anyway
+                    </div>
+                `;
+            } else {
+                results.innerHTML = data.map(a => `
                     <div class="address-option" onclick="selectAddressModal('${a.display_name.replace(/'/g, "\\'")}', ${a.lat}, ${a.lon})">
                         📍 ${a.display_name}
                     </div>
                 `).join('');
+            }
         } catch (e) { console.error('Geocode error:', e); }
     }, 400);
 }
