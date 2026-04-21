@@ -248,10 +248,14 @@ function renderMerchants(filter = '') {
     grid.innerHTML = filtered.map(m => {
         const itemCount = (m.menuItems || []).length;
         const emoji = getCategoryEmoji(m.category);
+        const imageHtml = m.logoUrl 
+            ? `<img src="${m.logoUrl}" alt="${m.name}" class="merchant-logo-img">`
+            : emoji;
+            
         return `
             <div class="merchant-card" onclick="openMerchant(${m.id})">
                 <div class="merchant-card-img">
-                    ${emoji}
+                    ${imageHtml}
                     <span class="merchant-tag">${m.category}</span>
                 </div>
                 <div class="merchant-card-body">
@@ -330,8 +334,18 @@ function openMerchant(id) {
     if (!m) return;
     state.selectedMerchant = m;
 
+    const logoHtml = m.logoUrl 
+        ? `<img src="${m.logoUrl}" class="menu-merchant-logo" alt="${m.name}">`
+        : '';
+
     document.getElementById('menuName').textContent = m.name;
     document.getElementById('menuMeta').textContent = `${m.category} • ${m.address}`;
+    
+    // Update banner with logo if present
+    const banner = document.querySelector('.menu-merchant-banner');
+    const existingLogo = banner.querySelector('.menu-merchant-logo');
+    if (existingLogo) existingLogo.remove();
+    if (logoHtml) banner.insertAdjacentHTML('afterbegin', logoHtml);
 
     const items = m.menuItems || [];
     const container = document.getElementById('menuCategories');
