@@ -17,7 +17,7 @@ let state = {
     isRegister: false,
     merchants: [],
     selectedMerchant: null,
-    cart: [],
+    cart: JSON.parse(localStorage.getItem('ew_cart') || '[]'),
     deliveryAddress: localStorage.getItem('ew_address') || '',
     deliveryLat: parseFloat(localStorage.getItem('ew_lat')) || null,
     deliveryLng: parseFloat(localStorage.getItem('ew_lng')) || null,
@@ -371,6 +371,21 @@ function openMerchant(id) {
 
 // ─── CART ───
 function addToCart(id, name, price) {
+    // Prevent mixing merchants
+    if (state.cart.length > 0) {
+        // Find if the item belongs to the currently selected merchant
+        const belongsToSelected = state.selectedMerchant && 
+            state.selectedMerchant.menuItems.some(mi => mi.id === id);
+            
+        if (!belongsToSelected) {
+            if (confirm('Your cart contains items from another restaurant. Clear cart and add this item?')) {
+                state.cart = [];
+            } else {
+                return;
+            }
+        }
+    }
+
     const existing = state.cart.find(i => i.id === id);
     if (existing) {
         existing.qty++;
@@ -378,12 +393,18 @@ function addToCart(id, name, price) {
         state.cart.push({ id, name, price, qty: 1 });
     }
     updateCartBadge();
+    saveCart();
     showToast(`${name} added to cart`);
+}
+
+function saveCart() {
+    localStorage.setItem('ew_cart', JSON.stringify(state.cart));
 }
 
 function removeFromCart(id) {
     state.cart = state.cart.filter(i => i.id !== id);
     updateCartBadge();
+    saveCart();
     renderCartSheet();
 }
 
@@ -395,6 +416,7 @@ function changeQty(id, delta) {
         state.cart = state.cart.filter(i => i.id !== id);
     }
     updateCartBadge();
+    saveCart();
     renderCartSheet();
 }
 
@@ -632,6 +654,15 @@ async function processCheckout() {
         showToast(e.message);
         btn.disabled = false;
         btn.textContent = 'Place Order & Pay';
+
+        // If items are not found (stale cart), clear it
+        if (e.message.includes('not found')) {
+            state.cart = [];
+            localStorage.removeItem('ew_cart');
+            updateCartBadge();
+            closeCart();
+            showToast('Your cart was stale and has been cleared. Please re-add items.');
+        }
     }
 }
 
