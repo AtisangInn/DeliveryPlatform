@@ -76,9 +76,9 @@ public static class DbInitializer
         {
             Name = "Kitchen Hooligans",
             Category = "Fast Food",
-            Address = "Kagiso",
-            Latitude = -26.1600,
-            Longitude = 27.7800,
+            Address = "1504 Khutsa Street, Mogale City, 1754",
+            Latitude = -26.1585,
+            Longitude = 27.7745,
             IsActive = true,
             CommissionPercentage = 10.00m
         };
