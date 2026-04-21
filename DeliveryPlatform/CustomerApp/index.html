@@ -6,6 +6,14 @@
     <title>Easyway Deliveries — Fresh. Fast. Local.</title>
     <meta name="description" content="Order delicious meals from local restaurants in Kagiso. Fast delivery to your door.">
     <link rel="stylesheet" href="styles.css">
+    
+    <!-- PWA / App Store-less Install Support -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#e85d2a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Easyway">
+    <link rel="apple-touch-icon" href="assets/hooligans_logo.png">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
@@ -294,5 +302,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Easyway PWA ServiceWorker registered'))
+                    .catch(err => console.log('ServiceWorker error:', err));
+            });
+        }
+    </script>
 </body>
 </html>
