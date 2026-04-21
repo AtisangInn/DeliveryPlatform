@@ -448,39 +448,41 @@ function renderCartSheet() {
     }
 }
 
-// ─── ADDRESS AUTOCOMPLETE (NOMINATIM) ───
-function searchAddress(query) {
-    clearTimeout(addressTimer);
-    const results = document.getElementById('addressResults');
-    if (query.length < 3) {
-        results.classList.add('hidden');
+// ─── ADDRESS PICKER LOGIC ───
+async function useLiveLocation() {
+    if (!navigator.geolocation) {
+        showToast('Geolocation is not supported by your browser');
         return;
     }
-    addressTimer = setTimeout(async () => {
-        try {
-            const searchQuery = encodeURIComponent(query + (query.toLowerCase().includes('south africa') ? '' : ', South Africa'));
-            const res = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=json&q=${searchQuery}&limit=5&addressdetails=1`,
-                { headers: { 'Accept-Language': 'en' } }
-            );
-            const data = await res.json();
-            if (data.length === 0) {
-                results.innerHTML = `
-                    <div class="address-option" style="color:var(--text-muted)">No exact map matches</div>
-                    <div class="address-option" style="color:var(--accent); font-weight:600;" onclick="selectAddress('${query.replace(/'/g, "\\'")}', state.deliveryLat || ${KAGISO_CENTER[0]}, state.deliveryLng || ${KAGISO_CENTER[1]})">
-                        📍 Use "${query}" anyway
-                    </div>
-                `;
-            } else {
-                results.innerHTML = data.map(a => `
-                    <div class="address-option" onclick="selectAddress('${a.display_name.replace(/'/g, "\\'")}', ${a.lat}, ${a.lon})">
-                        📍 ${a.display_name}
-                    </div>
-                `).join('');
+
+    const btn = document.getElementById('useLiveLocationBtn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '⌛ Accessing GPS...';
+    btn.disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            if (locationPickerMapInstance) {
+                locationPickerMapInstance.setView([lat, lng], 18);
             }
-            results.classList.remove('hidden');
-        } catch (e) { console.error('Geocode error:', e); }
-    }, 400);
+            btn.innerHTML = '✓ Location Accessed';
+            btn.classList.add('btn-success');
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                btn.classList.remove('btn-success');
+            }, 2000);
+        },
+        (err) => {
+            console.error('Location error:', err);
+            showToast('Permission denied or GPS error');
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
 }
 
 function selectAddress(display, lat, lng) {
@@ -492,19 +494,19 @@ function selectAddress(display, lat, lng) {
     localStorage.setItem('ew_lng', lng);
 
     document.getElementById('deliveryAddressInput').value = display;
-    document.getElementById('addressResults').classList.add('hidden');
     document.getElementById('headerAddress').textContent = display.split(',')[0];
 
     const selected = document.getElementById('selectedAddress');
-    selected.textContent = '✓ Address confirmed';
-    selected.classList.remove('hidden');
+    if (selected) {
+        selected.textContent = '✓ Address confirmed';
+        selected.classList.remove('hidden');
+    }
 }
 
 // Address modal
 function openAddressModal() {
     document.getElementById('addressModal').classList.remove('hidden');
-    document.getElementById('modalAddressInput').value = '';
-    document.getElementById('modalAddressResults').innerHTML = '';
+    // We don't clear the input if it already has a value, helps user edit
     
     // Initialize map if missing
     if (!locationPickerMapInstance) {
@@ -514,6 +516,14 @@ function openAddressModal() {
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap'
         }).addTo(locationPickerMapInstance);
+
+        // Add a static center marker
+        const centerIcon = L.divIcon({
+            className: 'custom-pin',
+            html: '<div style="font-size:30px; transform:translate(-15px, -30px);">📍</div>',
+            iconSize: [30, 30]
+        });
+        // We'll just rely on the user positioning the map under the static CSS pin
     } else {
         locationPickerMapInstance.setView([state.deliveryLat || KAGISO_CENTER[0], state.deliveryLng || KAGISO_CENTER[1]], 16);
     }
@@ -527,83 +537,45 @@ function closeAddressModal() {
     document.getElementById('addressModal').classList.add('hidden');
 }
 
-function searchAddressModal(query) {
-    clearTimeout(addressTimer);
-    const results = document.getElementById('modalAddressResults');
-    if (query.length < 3) {
-        results.innerHTML = '';
-        return;
-    }
-    addressTimer = setTimeout(async () => {
-        try {
-            const searchQuery = encodeURIComponent(query + (query.toLowerCase().includes('south africa') ? '' : ', South Africa'));
-            const res = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=json&q=${searchQuery}&limit=5&addressdetails=1`,
-                { headers: { 'Accept-Language': 'en' } }
-            );
-            const data = await res.json();
-            if (data.length === 0) {
-                results.innerHTML = `
-                    <div class="address-option" style="color:var(--text-muted)">No exact map matches</div>
-                    <div class="address-option" style="color:var(--accent); font-weight:600;" onclick="selectAddressModal('${query.replace(/'/g, "\\'")}', state.deliveryLat || ${KAGISO_CENTER[0]}, state.deliveryLng || ${KAGISO_CENTER[1]})">
-                        📍 Use "${query}" anyway
-                    </div>
-                `;
-            } else {
-                results.innerHTML = data.map(a => `
-                    <div class="address-option" onclick="selectAddressModal('${a.display_name.replace(/'/g, "\\'")}', ${a.lat}, ${a.lon})">
-                        📍 ${a.display_name}
-                    </div>
-                `).join('');
-            }
-        } catch (e) { console.error('Geocode error:', e); }
-    }, 400);
-}
-
-function selectAddressModal(display, lat, lng) {
-    document.getElementById('modalAddressInput').value = display;
-    document.getElementById('modalAddressResults').innerHTML = '';
-    if (locationPickerMapInstance) {
-        locationPickerMapInstance.setView([lat, lng], 18);
-    }
-}
-
 async function confirmMapPin() {
     if (!locationPickerMapInstance) return;
     const center = locationPickerMapInstance.getCenter();
     const lat = center.lat;
     const lng = center.lng;
 
-    showToast('Fetching address...');
     const btn = document.getElementById('confirmLocationBtn');
+    const originalText = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Confirming...';
 
     const inputVal = document.getElementById('modalAddressInput').value.trim();
 
     try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-        const data = await res.json();
+        let display = "";
         
-        let display = "Pinned Location";
-        if (data && data.display_name) {
-            display = data.address.road ? `${data.address.road}` : data.display_name.split(',')[0];
-        }
-        
-        if (inputVal && inputVal.length >= 3) {
+        // If user entered a house number, use that as the primary label
+        if (inputVal.length > 0) {
             display = inputVal;
+            // Append town if it's missing
+            if (!display.toLowerCase().includes('kagiso')) display += ", Kagiso";
+        } else {
+            // Otherwise try to reverse geocode a street name
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+            const data = await res.json();
+            display = (data.address.road ? data.address.road : "Kagiso") + ", Mogale City";
         }
 
         selectAddress(display, lat, lng);
         closeAddressModal();
-        showToast('Delivery address updated');
+        showToast('Location confirmed!');
     } catch (e) {
+        console.error('Reverse geocode error:', e);
+        // Fallback to whatever is in the box
         selectAddress(inputVal || "Pinned Location", lat, lng);
         closeAddressModal();
-        showToast('Delivery location set');
     } finally {
         btn.disabled = false;
-        btn.textContent = 'Confirm Pin Location';
+        btn.textContent = originalText;
     }
 }
 

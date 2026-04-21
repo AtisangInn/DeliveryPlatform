@@ -246,8 +246,8 @@
                 <div class="address-section">
                     <label class="address-label">Delivery Address</label>
                     <div class="address-input-wrap">
-                        <span class="address-pin">📍</span>
-                        <input type="text" id="deliveryAddressInput" placeholder="Start typing your address..." autocomplete="off" oninput="searchAddress(this.value)">
+                        <span class="address-pin">🏠</span>
+                        <input type="text" id="deliveryAddressInput" placeholder="Enter House # and Street (e.g. 1504 Khutsa St)" autocomplete="off">
                     </div>
                     <div id="addressResults" class="address-dropdown hidden">
                         <!-- Address suggestions -->
@@ -272,10 +272,12 @@
             
             <div class="map-search-container">
                 <div class="address-input-wrap">
-                    <span class="address-pin">📍</span>
-                    <input type="text" id="modalAddressInput" placeholder="Search or move pin..." autocomplete="off" oninput="searchAddressModal(this.value)">
+                    <span class="address-pin">🏠</span>
+                    <input type="text" id="modalAddressInput" placeholder="House # and Street (e.g. 1234 Molatloa St)" autocomplete="off">
                 </div>
-                <div id="modalAddressResults" class="address-dropdown-static absolute-results"></div>
+                <button class="btn-secondary btn-sm" id="useLiveLocationBtn" onclick="useLiveLocation()" style="margin-top: 10px; width: 100%;">
+                    📍 Use My Current Location
+                </button>
             </div>
 
             <div id="locationPickerMap" class="location-picker-map"></div>

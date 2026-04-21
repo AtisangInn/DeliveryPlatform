@@ -1122,14 +1122,12 @@ a { color: var(--accent); text-decoration: none; }
 }
 
 .location-picker-map {
-    flex: 1;
+    height: 350px;
     width: 100%;
-    background: #e5e5e5;
     position: relative;
-    z-index: 1;
 }
 
-/* Center crosshair for dropping pin */
+/* Fixed Center Pin */
 .location-picker-map::after {
     content: '📍';
     position: absolute;
