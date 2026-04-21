@@ -184,9 +184,9 @@ function navigateTo(viewId, btn) {
     if (viewId === 'orders') loadOrders();
     if (viewId === 'tracking') initTracking();
 
-    // Show/hide header for tracking view
-    document.getElementById('appHeader').style.display = viewId === 'tracking' ? 'none' : 'flex';
-    document.getElementById('bottomNav').style.display = viewId === 'tracking' ? 'none' : 'flex';
+    // Header and footer are now always visible
+    document.getElementById('appHeader').style.display = 'flex';
+    document.getElementById('bottomNav').style.display = 'flex';
 }
 
 function goHome() {
@@ -362,7 +362,6 @@ function openMerchant(id) {
 
     navigateTo('menu', null);
     document.getElementById('viewMenu').classList.add('active-view');
-    document.getElementById('appHeader').style.display = 'none';
 }
 
 // ─── CART ───
