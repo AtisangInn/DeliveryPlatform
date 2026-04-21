@@ -22,6 +22,10 @@ public class OrderService : IOrderService
 
     public async Task<CheckoutResponse> CheckoutAsync(CheckoutRequest request, int customerId, string customerEmail)
     {
+        // 0. Verify customer exists (Prevents stale session FK errors)
+        var customerExists = await _context.Users.AnyAsync(u => u.Id == customerId);
+        if (!customerExists) throw new Exception("User session has expired. Please log out and log in again.");
+
         // 1. Validate items and calculate total from DB prices (Security Hardening)
         var menuItemIds = request.Items.Select(i => i.MenuItemId).ToList();
         var menuItems = await _context.MenuItems

@@ -236,6 +236,8 @@ function renderMerchants(filter = '') {
         );
     }
 
+    if (!grid || !empty) return;
+
     if (filtered.length === 0) {
         grid.innerHTML = '';
         empty.classList.remove('hidden');
@@ -662,6 +664,12 @@ async function processCheckout() {
             updateCartBadge();
             closeCart();
             showToast('Your cart was stale and has been cleared. Please re-add items.');
+        }
+
+        // If session expired (happens after DB reset/wipe)
+        if (e.message.toLowerCase().includes('session has expired') || e.message.toLowerCase().includes('user session')) {
+            showToast('Your session has expired. Please log in again.');
+            setTimeout(logout, 2000);
         }
     }
 }
