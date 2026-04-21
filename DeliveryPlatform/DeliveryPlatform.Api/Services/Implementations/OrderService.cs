@@ -75,11 +75,10 @@ public class OrderService : IOrderService
         var frontendUrl = _config["Deployment:FrontendUrl"]?.TrimEnd('/');
         var backendUrl = _config["Deployment:BackendUrl"]?.TrimEnd('/');
 
-        // Correct URLs for production
-        var returnUrl = $"{backendUrl}/api/Payment/success?orderId={order.Id}"; 
-        var cancelUrl = $"{backendUrl}/api/Payment/cancel";
-        var notifyUrl = $"{backendUrl}/api/Payment/itn"; 
-
+        // Correct URLs for production: Redirect back to the Customer App UI
+        var returnUrl = $"{frontendUrl}/index.html?status=success&orderId={order.Id}"; 
+        var cancelUrl = $"{frontendUrl}/index.html?status=cancel";
+        var notifyUrl = $"{backendUrl}/api/Payment/itn"; // ITN stays on backend
         var htmlForm = $@"
             <form id='payfast-form' action='{pfUrl}' method='post'>
                 <input type='hidden' name='merchant_id' value='{pfMerchantId}'>

@@ -135,6 +135,7 @@ public class PaymentController : ControllerBase
     [HttpGet("cancel")]
     public IActionResult ReturnCancel()
     {
-         return Content("<html><body style='font-family:sans-serif; text-align:center; padding:50px; background:#EF4444; color:white;'><h1>Payment Cancelled.</h1><p>Please try again.</p></body></html>", "text/html");
+        var frontendUrl = _config["Deployment:FrontendUrl"]?.TrimEnd('/') ?? "https://delivery-platform.vercel.app";
+        return Redirect($"{frontendUrl}/index.html?status=cancel");
     }
 }

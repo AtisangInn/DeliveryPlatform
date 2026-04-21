@@ -39,6 +39,16 @@ function init() {
         showAuth();
     }
     setupAuthListeners();
+
+    // Check for payment redirect params
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('status') === 'success') {
+        showToast('Payment successful!');
+        window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (params.get('status') === 'cancel') {
+        showToast('Payment cancelled');
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
 }
 
 function showAuth() {
