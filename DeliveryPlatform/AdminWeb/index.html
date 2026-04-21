@@ -252,18 +252,21 @@
             </div>
             <div class="modal-divider"></div>
             <h3 class="modal-section-title">Add Menu Item</h3>
-            <form id="menuItemForm" onsubmit="handleAddMenuItem(event)">
+            <form id="menuItemForm" onsubmit="handleSaveMenuItem(event)">
                 <input type="hidden" id="mi_merchantId">
+                <input type="hidden" id="mi_id">
                 <div class="form-row">
                     <div class="input-group"><label>Item Name</label><input type="text" id="mi_name" required></div>
                     <div class="input-group"><label>Price (R)</label><input type="number" id="mi_price" step="0.01" min="1" required></div>
                 </div>
                 <div class="form-row">
                     <div class="input-group"><label>Category</label><input type="text" id="mi_category" placeholder="e.g. Kotas, Chips, Drinks"></div>
-                    <div class="input-group"><label>Description</label><input type="text" id="mi_desc"></div>
+                    <div class="input-group"><label>Image URL</label><input type="url" id="mi_imageUrl" placeholder="https://example.com/food.jpg"></div>
                 </div>
+                <div class="input-group"><label>Description</label><input type="text" id="mi_desc"></div>
                 <div class="modal-actions">
-                    <button type="submit" class="btn-accent">Add Item</button>
+                    <button type="button" class="btn-cancel" onclick="resetMenuItemForm()" id="mi_cancelEdit" style="display:none;">Cancel Edit</button>
+                    <button type="submit" class="btn-accent" id="mi_submitBtn">Add Item</button>
                 </div>
             </form>
         </div>

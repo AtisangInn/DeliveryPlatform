@@ -354,7 +354,12 @@ function openMerchant(id) {
                         <p class="item-desc">${item.description}</p>
                         <span class="item-price">R${item.price.toFixed(2)}</span>
                     </div>
-                    <button class="add-item-btn" onclick="addToCart(${item.id}, '${item.name.replace(/'/g, "\\'")}', ${item.price})">+</button>
+                    <div class="menu-item-right">
+                        <div class="menu-item-image">
+                            ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.name}">` : '🍔'}
+                        </div>
+                        <button class="add-item-btn" onclick="addToCart(${item.id}, '${item.name.replace(/'/g, "\\'")}', ${item.price})">+</button>
+                    </div>
                 </div>
             `).join('')}
         `).join('');

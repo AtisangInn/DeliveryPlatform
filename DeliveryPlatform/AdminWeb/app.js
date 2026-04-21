@@ -452,37 +452,98 @@ function renderMenuItems(items) {
 
     list.innerHTML = items.map(item => `
         <div class="menu-admin-item">
-            <div>
-                <strong>${item.name}</strong>
-                <span class="item-cat"> • ${item.category || 'Uncategorized'}</span>
+            <div class="menu-admin-left">
+                <div class="menu-admin-img">
+                    ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.name}">` : '🍔'}
+                </div>
+                <div>
+                    <strong>${item.name}</strong>
+                    <span class="item-cat"> • ${item.category || 'Uncategorized'}</span>
+                </div>
             </div>
             <div style="display:flex;align-items:center;gap:0.75rem;">
                 <span class="item-price">R${item.price.toFixed(2)}</span>
+                <button class="edit-btn" onclick="editMenuItem(${item.id})">✎</button>
                 <button class="delete-btn" onclick="deleteMenuItem(${item.id})">✕</button>
             </div>
         </div>
     `).join('');
 }
 
-async function handleAddMenuItem(e) {
+function resetMenuItemForm() {
+    document.getElementById('menuItemForm').reset();
+    document.getElementById('mi_id').value = '';
+    document.getElementById('mi_submitBtn').textContent = 'Add Item';
+    document.getElementById('mi_cancelEdit').style.display = 'none';
+}
+
+function editMenuItem(itemId) {
+    const merchant = state.merchants.find(m => m.id === currentMenuMerchantId);
+    if (!merchant) return;
+    const item = merchant.menuItems.find(i => i.id === itemId);
+    if (!item) return;
+
+    document.getElementById('mi_id').value = item.id;
+    document.getElementById('mi_name').value = item.name;
+    document.getElementById('mi_price').value = item.price;
+    document.getElementById('mi_category').value = item.category || '';
+    document.getElementById('mi_desc').value = item.description || '';
+    document.getElementById('mi_imageUrl').value = item.imageUrl || '';
+
+    document.getElementById('mi_submitBtn').textContent = 'Update Item';
+    document.getElementById('mi_cancelEdit').style.display = 'inline-block';
+    
+    // Scroll to form
+    document.getElementById('menuItemForm').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function handleSaveMenuItem(e) {
     e.preventDefault();
     const merchantId = parseInt(document.getElementById('mi_merchantId').value);
+    const itemId = document.getElementById('mi_id').value;
 
     const payload = {
+        id: itemId ? parseInt(itemId) : 0,
         merchantId,
         name: document.getElementById('mi_name').value.trim(),
         price: parseFloat(document.getElementById('mi_price').value),
         category: document.getElementById('mi_category').value.trim() || 'General',
         description: document.getElementById('mi_desc').value.trim(),
+        imageUrl: document.getElementById('mi_imageUrl').value.trim(),
         isAvailable: true
     };
 
     try {
-        await apiPost(`Merchant/${merchantId}/menu`, payload);
-        showToast('Menu item added');
-        document.getElementById('menuItemForm').reset();
+        if (itemId) {
+            // Update
+            await fetch(`${API_URL}/Merchant/${merchantId}/menu/${itemId}`, {
+                method: 'PUT',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${state.authToken}` 
+                },
+                body: JSON.stringify(payload)
+            });
+            showToast('Menu item updated');
+        } else {
+            // Create
+            await apiPost(`Merchant/${merchantId}/menu`, payload);
+            showToast('Menu item added');
+        }
+        
+        resetMenuItemForm();
         document.getElementById('mi_merchantId').value = merchantId;
-        openMenuModal(merchantId); // Refresh
+        
+        // Refresh merchant data to get updated menu
+        const mRes = await fetch(`${API_URL}/Merchant/${merchantId}`, {
+            headers: { 'Authorization': `Bearer ${state.authToken}` }
+        });
+        if (mRes.ok) {
+            const updatedMerchant = await mRes.json();
+            const idx = state.merchants.findIndex(m => m.id === merchantId);
+            if (idx !== -1) state.merchants[idx] = updatedMerchant;
+            renderMenuItems(updatedMerchant.menuItems || []);
+        }
     } catch (e) {
         showToast('Error: ' + e.message);
     }
