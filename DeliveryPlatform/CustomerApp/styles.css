@@ -246,9 +246,9 @@ a { color: var(--accent); text-decoration: none; }
     font-size: 0.9rem;
 }
 
-.install-card {
-    background: #f8fafc;
-    border: 2px dashed var(--accent);
+.install-card-premium {
+    background: linear-gradient(135deg, var(--accent) 0%, #ff8a65 100%);
+    color: white;
     border-radius: var(--radius-lg);
     padding: 1.25rem;
     display: flex;
@@ -1318,4 +1318,73 @@ a { color: var(--accent); text-decoration: none; }
     .merchant-grid {
         grid-template-columns: repeat(2, 1fr);
     }
+}
+
+.install-card-premium {
+    background: linear-gradient(135deg, var(--accent) 0%, #ff8a65 100%);
+    color: white;
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(232, 93, 42, 0.3);
+    transition: transform 0.2s;
+}
+
+.install-card-premium:active {
+    transform: scale(0.98);
+}
+
+.install-icon {
+    font-size: 1.5rem;
+    background: rgba(255,255,255,0.2);
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.install-text {
+    flex: 1;
+}
+
+.install-text h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.install-text p {
+    margin: 0;
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+.install-arrow {
+    font-size: 1.2rem;
+    opacity: 0.8;
+}
+
+.guide-box {
+    text-align: left;
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+}
+
+.guide-box ol {
+    padding-left: 1.5rem;
+    line-height: 1.6;
+    margin: 0;
+}
+
+.guide-box li {
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
 }

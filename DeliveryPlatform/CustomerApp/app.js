@@ -44,23 +44,39 @@ window.addEventListener('beforeinstallprompt', (e) => {
 });
 
 async function installApp() {
-    // Check if it's iOS
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    
+    // Open the visual guide modal
+    document.getElementById('installModal').classList.remove('hidden');
     
     if (isIOS) {
-        showToast('To install: Tap the Share button (square with arrow) and select "Add to Home Screen".');
-        return;
+        document.getElementById('iosGuide').classList.remove('hidden');
+        document.getElementById('androidGuide').classList.add('hidden');
+        document.getElementById('pwaDirectBtn').classList.add('hidden');
+    } else {
+        // Default to Android/Chrome guide
+        document.getElementById('androidGuide').classList.remove('hidden');
+        document.getElementById('iosGuide').classList.add('hidden');
+        // If native prompt is available, show the direct button too
+        if (deferredPrompt) {
+            document.getElementById('pwaDirectBtn').classList.remove('hidden');
+        } else {
+            document.getElementById('pwaDirectBtn').classList.add('hidden');
+        }
     }
+}
 
-    if (!deferredPrompt) {
-        showToast('Open this site in Chrome to install the app icon.');
-        return;
-    }
-    // Show the install prompt
+async function triggerNativeInstall() {
+    if (!deferredPrompt) return;
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     deferredPrompt = null;
-    document.getElementById('installContainer').classList.add('hidden');
+    closeInstallModal();
+}
+
+function closeInstallModal() {
+    document.getElementById('installModal').classList.add('hidden');
 }
 
 window.addEventListener('appinstalled', (evt) => {

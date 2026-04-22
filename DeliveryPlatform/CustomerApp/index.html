@@ -214,15 +214,13 @@
                 </div>
                 
                 <div class="install-section hidden" id="installContainer">
-                    <div class="install-card">
-                        <span>📲</span>
-                        <div>
-                            <h4>Install Easyway</h4>
-                            <p>Add to your home screen for faster access</p>
-                            <p class="ios-hint">iPhone: Tap Share ➔ Add to Home Screen</p>
-                            <p class="android-hint">Android: Tap (⋮) ➔ Install App</p>
+                    <div class="install-card-premium" onclick="installApp()">
+                        <div class="install-icon">⚡</div>
+                        <div class="install-text">
+                            <h4>Get the Easyway App</h4>
+                            <p>Faster orders, real-time tracking, and no browser tabs.</p>
                         </div>
-                        <button class="btn-primary btn-sm" onclick="installApp()">Install</button>
+                        <div class="install-arrow">➔</div>
                     </div>
                 </div>
 
@@ -343,6 +341,50 @@
 
     <!-- Toast Notification -->
     <div id="toast" class="toast hidden"></div>
+
+    </div>
+
+    <!-- ============ INSTALL GUIDE MODAL ============ -->
+    <div id="installModal" class="sheet-overlay hidden" onclick="closeInstallModal()">
+        <div class="sheet" style="max-width: 400px; margin: auto; height: auto; border-radius: 20px; padding-bottom: 2rem;" onclick="event.stopPropagation()">
+            <div class="sheet-header">
+                <h2>Install Easyway</h2>
+                <button class="close-btn" onclick="closeInstallModal()">✕</button>
+            </div>
+            
+            <div style="padding: 1.5rem; text-align: center;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">📲</div>
+                <h3>Get the App Icon</h3>
+                <p style="color: #666; margin-bottom: 1.5rem;">Install Easyway to your home screen for the best experience.</p>
+                
+                <div id="iosGuide" class="hidden" style="text-align: left; background: #f8f9fa; padding: 1rem; border-radius: 12px; margin-bottom: 1rem;">
+                    <ol style="padding-left: 1.5rem; line-height: 1.6;">
+                        <li>Tap the <strong>Share</strong> button at the bottom of Safari.</li>
+                        <li>Scroll down and tap <strong>Add to Home Screen</strong>.</li>
+                        <li>Tap <strong>Add</strong> in the top right.</li>
+                    </ol>
+                </div>
+                
+                <div id="androidGuide" class="hidden" style="text-align: left; background: #f8f9fa; padding: 1rem; border-radius: 12px; margin-bottom: 1rem;">
+                    <ol style="padding-left: 1.5rem; line-height: 1.6;">
+                        <li>Tap the <strong>Menu</strong> button (three dots ⋮) in the top right of Chrome.</li>
+                        <li>Tap <strong>Install app</strong> or <strong>Add to Home Screen</strong>.</li>
+                        <li>Confirm the installation.</li>
+                    </ol>
+                </div>
+
+                <div id="pwaDirectBtn" class="hidden" style="margin-top: 1.5rem;">
+                    <button class="btn-primary btn-lg" onclick="triggerNativeInstall()" style="width: 100%;">
+                        Install Now
+                    </button>
+                </div>
+                
+                <button class="btn-secondary" onclick="closeInstallModal()" style="margin-top: 1rem; width: 100%;">
+                    Maybe Later
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
