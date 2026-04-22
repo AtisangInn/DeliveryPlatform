@@ -278,6 +278,12 @@ a { color: var(--accent); text-decoration: none; }
     color: var(--accent) !important;
 }
 
+.android-hint {
+    font-size: 0.75rem !important;
+    font-weight: 600;
+    color: #3b82f6 !important;
+}
+
 .account-actions {
     display: flex;
     flex-direction: column;

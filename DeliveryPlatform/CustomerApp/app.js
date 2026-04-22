@@ -231,18 +231,14 @@ function loadProfile() {
     document.getElementById('profileName').textContent = state.userName || 'Valued Customer';
     document.getElementById('profileEmail').textContent = 'Kagiso Local';
     
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
     const installContainer = document.getElementById('installContainer');
 
     if (isStandalone) {
-        // App is already installed, hide the prompt
         installContainer.classList.add('hidden');
-    } else if (isIOS) {
-        // Always show on iOS because beforeinstallprompt never fires there
-        installContainer.classList.remove('hidden');
-    } else if (deferredPrompt) {
-        // Show on Android if the prompt was captured
+    } else if (isMobile) {
+        // Always show on mobile to provide manual instructions at the very least
         installContainer.classList.remove('hidden');
     }
 }
