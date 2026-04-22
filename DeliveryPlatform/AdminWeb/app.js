@@ -367,6 +367,7 @@ function editMerchant(id) {
     document.getElementById('m_category').value = merchant.category;
     document.getElementById('m_commission').value = merchant.commissionPercentage;
     document.getElementById('merchantModalTitle').textContent = 'Edit Merchant';
+    document.getElementById('m_submitBtn').textContent = 'Update Merchant';
 
     openModal('merchantModal');
 
@@ -377,6 +378,10 @@ function editMerchant(id) {
 
 async function handleAddMerchant(e) {
     e.preventDefault();
+    const btn = document.getElementById('m_submitBtn');
+    const originalBtnText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
 
     const id = document.getElementById('m_id').value;
     const name = document.getElementById('m_name').value.trim();
@@ -406,7 +411,7 @@ async function handleAddMerchant(e) {
 
     try {
         if (id) {
-            await fetch(`${API_URL}/Merchant/${id}`, {
+            const res = await fetch(`${API_URL}/Merchant/${id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -414,6 +419,7 @@ async function handleAddMerchant(e) {
                 },
                 body: JSON.stringify(payload)
             });
+            if (!res.ok) throw new Error('Update failed');
             showToast('Merchant updated successfully');
         } else {
             await apiPost('Merchant', payload);
@@ -424,12 +430,20 @@ async function handleAddMerchant(e) {
         state.merchants = await apiGet('Merchant');
         renderMerchants();
         updateMapPoints();
-        document.getElementById('merchantForm').reset();
-        document.getElementById('m_id').value = '';
-        document.getElementById('merchantModalTitle').textContent = 'Add Merchant';
+        resetMerchantForm();
     } catch (e) {
         showToast('Error: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalBtnText;
     }
+}
+
+function resetMerchantForm() {
+    document.getElementById('merchantForm').reset();
+    document.getElementById('m_id').value = '';
+    document.getElementById('merchantModalTitle').textContent = 'Add Merchant';
+    document.getElementById('m_submitBtn').textContent = 'Add Merchant';
 }
 
 async function toggleMerchant(id, newStatus) {
@@ -696,6 +710,7 @@ function openModal(id) {
 
 function closeModal(id) {
     document.getElementById(id).classList.add('hidden');
+    if (id === 'merchantModal') resetMerchantForm();
 }
 
 // ─── UTILITIES ───
