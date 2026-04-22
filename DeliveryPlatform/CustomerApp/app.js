@@ -231,9 +231,19 @@ function loadProfile() {
     document.getElementById('profileName').textContent = state.userName || 'Valued Customer';
     document.getElementById('profileEmail').textContent = 'Kagiso Local';
     
-    // Check if app is already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-        document.getElementById('installContainer').classList.add('hidden');
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    const installContainer = document.getElementById('installContainer');
+
+    if (isStandalone) {
+        // App is already installed, hide the prompt
+        installContainer.classList.add('hidden');
+    } else if (isIOS) {
+        // Always show on iOS because beforeinstallprompt never fires there
+        installContainer.classList.remove('hidden');
+    } else if (deferredPrompt) {
+        // Show on Android if the prompt was captured
+        installContainer.classList.remove('hidden');
     }
 }
 
