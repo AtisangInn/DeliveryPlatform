@@ -30,6 +30,41 @@ let hubConnection = null;
 let trackingMap = null;
 let addressTimer = null;
 let locationPickerMapInstance = null;
+let deferredPrompt = null;
+
+// ─── PWA INSTALL LOGIC ───
+window.addEventListener('beforeinstallprompt', (e) => {
+    // Prevent the mini-infobar from appearing on mobile
+    e.preventDefault();
+    // Stash the event so it can be triggered later.
+    deferredPrompt = e;
+    // Update UI notify the user they can install the PWA
+    const installContainer = document.getElementById('installContainer');
+    if (installContainer) {
+        installContainer.classList.remove('hidden');
+    }
+});
+
+async function installApp() {
+    if (!deferredPrompt) {
+        showToast('App is already installed or your browser doesn\'t support this feature.');
+        return;
+    }
+    // Show the install prompt
+    deferredPrompt.prompt();
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User response to the install prompt: ${outcome}`);
+    // We've used the prompt, and can't use it again, throw it away
+    deferredPrompt = null;
+    // Hide the install UI
+    document.getElementById('installContainer').classList.add('hidden');
+}
+
+window.addEventListener('appinstalled', (evt) => {
+    console.log('Easyway was installed.');
+    showToast('Success! Easyway is now on your home screen.');
+});
 
 // ─── INIT ───
 function init() {
@@ -183,10 +218,21 @@ function navigateTo(viewId, btn) {
     if (viewId === 'home') loadMerchants();
     if (viewId === 'orders') loadOrders();
     if (viewId === 'tracking') initTracking();
+    if (viewId === 'account') loadProfile();
 
     // Header and footer are now always visible
     document.getElementById('appHeader').style.display = 'flex';
     document.getElementById('bottomNav').style.display = 'flex';
+}
+
+function loadProfile() {
+    document.getElementById('profileName').textContent = state.userName || 'Valued Customer';
+    document.getElementById('profileEmail').textContent = 'Kagiso Local';
+    
+    // Check if app is already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+        document.getElementById('installContainer').classList.add('hidden');
+    }
 }
 
 function goHome() {

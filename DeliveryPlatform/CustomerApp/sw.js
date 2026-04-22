@@ -5,7 +5,7 @@ const ASSETS = [
     '/styles.css',
     '/app.js',
     '/manifest.json',
-    '/assets/hooligans_logo.png'
+    '/assets/app_icon.png'
 ];
 
 self.addEventListener('install', event => {

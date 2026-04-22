@@ -198,6 +198,39 @@
                 <p>Your order history will appear here</p>
             </div>
         </section>
+        
+        <!-- ============ ACCOUNT VIEW ============ -->
+        <section id="viewAccount" class="view">
+            <div class="account-header">
+                <h1>Your Account</h1>
+            </div>
+            <div class="account-card">
+                <div class="account-user">
+                    <div class="user-avatar">👤</div>
+                    <div class="user-info">
+                        <h3 id="profileName">Loading...</h3>
+                        <p id="profileEmail"></p>
+                    </div>
+                </div>
+                
+                <div class="install-section hidden" id="installContainer">
+                    <div class="install-card">
+                        <span>📲</span>
+                        <div>
+                            <h4>Install Easyway</h4>
+                            <p>Add to your home screen for faster access</p>
+                        </div>
+                        <button class="btn-primary btn-sm" onclick="installApp()">Install</button>
+                    </div>
+                </div>
+
+                <div class="account-actions">
+                    <button class="account-btn" onclick="logout()">
+                        <span>🚪</span> Logout
+                    </button>
+                </div>
+            </div>
+        </section>
 
         <!-- ============ BOTTOM NAV ============ -->
         <nav class="bottom-nav" id="bottomNav">
@@ -213,9 +246,9 @@
                 <span class="nav-icon">📍</span>
                 <span class="nav-label">Track</span>
             </button>
-            <button class="nav-item" onclick="logout()">
+            <button class="nav-item" data-view="account" onclick="navigateTo('account', this)">
                 <span class="nav-icon">👤</span>
-                <span class="nav-label">Logout</span>
+                <span class="nav-label">Account</span>
             </button>
         </nav>
     </div>

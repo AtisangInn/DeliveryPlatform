@@ -195,7 +195,105 @@ a { color: var(--accent); text-decoration: none; }
     border-radius: var(--radius-md);
     font-weight: 700;
     font-size: 1rem;
-    transition: background 0.2s, transform 0.1s;
+    transition: opacity 0.3s, transform 0.3s;
+}
+
+/* ======= ACCOUNT VIEW ======= */
+#viewAccount {
+    padding: 1.5rem;
+}
+
+.account-header h1 {
+    font-size: 1.75rem;
+    font-weight: 800;
+    margin-bottom: 1.5rem;
+}
+
+.account-card {
+    background: var(--white);
+    border-radius: var(--radius-xl);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-md);
+}
+
+.account-user {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.user-avatar {
+    width: 64px;
+    height: 64px;
+    background: var(--accent-light);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+}
+
+.user-info h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.user-info p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.install-card {
+    background: #f8fafc;
+    border: 2px dashed var(--accent);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.install-card span {
+    font-size: 2rem;
+}
+
+.install-card h4 {
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.install-card p {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.account-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.account-btn {
+    width: 100%;
+    padding: 1rem;
+    border-radius: var(--radius-lg);
+    background: #fff;
+    border: 1px solid var(--border);
+    text-align: left;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.account-btn:active {
+    background: var(--bg-body);
 }
 
 .btn-primary:active { transform: scale(0.98); }
