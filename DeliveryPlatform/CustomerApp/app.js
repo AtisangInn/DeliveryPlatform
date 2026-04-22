@@ -34,11 +34,9 @@ let deferredPrompt = null;
 
 // ─── PWA INSTALL LOGIC ───
 window.addEventListener('beforeinstallprompt', (e) => {
-    // Prevent the mini-infobar from appearing on mobile
-    e.preventDefault();
     // Stash the event so it can be triggered later.
     deferredPrompt = e;
-    // Update UI notify the user they can install the PWA
+    // Show the install button in the account view
     const installContainer = document.getElementById('installContainer');
     if (installContainer) {
         installContainer.classList.remove('hidden');
@@ -46,18 +44,22 @@ window.addEventListener('beforeinstallprompt', (e) => {
 });
 
 async function installApp() {
+    // Check if it's iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    
+    if (isIOS) {
+        showToast('To install: Tap the Share button (square with arrow) and select "Add to Home Screen".');
+        return;
+    }
+
     if (!deferredPrompt) {
-        showToast('App is already installed or your browser doesn\'t support this feature.');
+        showToast('Open this site in Chrome to install the app icon.');
         return;
     }
     // Show the install prompt
     deferredPrompt.prompt();
-    // Wait for the user to respond to the prompt
     const { outcome } = await deferredPrompt.userChoice;
-    console.log(`User response to the install prompt: ${outcome}`);
-    // We've used the prompt, and can't use it again, throw it away
     deferredPrompt = null;
-    // Hide the install UI
     document.getElementById('installContainer').classList.add('hidden');
 }
 

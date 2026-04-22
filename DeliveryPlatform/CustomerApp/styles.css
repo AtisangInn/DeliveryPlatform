@@ -271,6 +271,13 @@ a { color: var(--accent); text-decoration: none; }
     color: var(--text-secondary);
 }
 
+.ios-hint {
+    margin-top: 0.25rem;
+    font-size: 0.75rem !important;
+    font-weight: 600;
+    color: var(--accent) !important;
+}
+
 .account-actions {
     display: flex;
     flex-direction: column;
