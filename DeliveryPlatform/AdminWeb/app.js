@@ -350,15 +350,35 @@ function renderMerchants() {
             </div>
             <div class="merchant-admin-actions">
                 <button class="btn-sm" onclick="openMenuModal(${m.id})">📋 Menu Items</button>
+                <button class="btn-sm" onclick="editMerchant(${m.id})">✎ Edit Details</button>
                 <button class="btn-sm" onclick="toggleMerchant(${m.id}, ${!m.isActive})">${m.isActive ? '⏸️ Pause' : '▶️ Activate'}</button>
             </div>
         </div>
     `).join('');
 }
 
+function editMerchant(id) {
+    const merchant = state.merchants.find(m => m.id === id);
+    if (!merchant) return;
+
+    document.getElementById('m_id').value = merchant.id;
+    document.getElementById('m_name').value = merchant.name;
+    document.getElementById('m_address').value = merchant.address;
+    document.getElementById('m_category').value = merchant.category;
+    document.getElementById('m_commission').value = merchant.commissionPercentage;
+    document.getElementById('merchantModalTitle').textContent = 'Edit Merchant';
+
+    openModal('merchantModal');
+
+    if (adminMerchantPickerMap && merchant.latitude && merchant.longitude) {
+        adminMerchantPickerMap.setView([merchant.latitude, merchant.longitude], 17);
+    }
+}
+
 async function handleAddMerchant(e) {
     e.preventDefault();
 
+    const id = document.getElementById('m_id').value;
     const name = document.getElementById('m_name').value.trim();
     const address = document.getElementById('m_address').value.trim();
     const category = document.getElementById('m_category').value;
@@ -374,6 +394,7 @@ async function handleAddMerchant(e) {
     }
 
     const payload = {
+        id: id ? parseInt(id) : 0,
         name,
         category,
         address,
@@ -384,13 +405,28 @@ async function handleAddMerchant(e) {
     };
 
     try {
-        await apiPost('Merchant', payload);
+        if (id) {
+            await fetch(`${API_URL}/Merchant/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${state.authToken}`
+                },
+                body: JSON.stringify(payload)
+            });
+            showToast('Merchant updated successfully');
+        } else {
+            await apiPost('Merchant', payload);
+            showToast('Merchant added successfully');
+        }
+        
         closeModal('merchantModal');
-        showToast('Merchant added successfully');
         state.merchants = await apiGet('Merchant');
         renderMerchants();
         updateMapPoints();
         document.getElementById('merchantForm').reset();
+        document.getElementById('m_id').value = '';
+        document.getElementById('merchantModalTitle').textContent = 'Add Merchant';
     } catch (e) {
         showToast('Error: ' + e.message);
     }
