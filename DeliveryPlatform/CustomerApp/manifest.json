@@ -1,23 +1,32 @@
 {
+  "id": "easyway-deliveries-v1",
   "name": "Easyway Deliveries",
   "short_name": "Easyway",
   "description": "Premium Local Delivery Platform",
-  "start_url": "/index.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#e85d2a",
+  "orientation": "portrait",
+  "scope": "./",
   "icons": [
     {
       "src": "assets/app_icon.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "assets/app_icon.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "assets/app_icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
