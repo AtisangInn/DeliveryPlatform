@@ -443,6 +443,25 @@ input, select { font-family: var(--font); }
 
 .merchant-admin-top h3 { font-size: 1rem; font-weight: 700; }
 
+.merchant-admin-logo-preview {
+    width: 32px;
+    height: 32px;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    font-size: 1rem;
+    border: 1px solid var(--border);
+}
+
+.merchant-admin-logo-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
 .merchant-status {
     font-size: 0.6rem;
     font-weight: 800;

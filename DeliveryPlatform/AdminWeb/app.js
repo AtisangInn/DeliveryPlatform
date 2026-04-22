@@ -340,7 +340,12 @@ function renderMerchants() {
     grid.innerHTML = state.merchants.map(m => `
         <div class="merchant-admin-card">
             <div class="merchant-admin-top">
-                <h3>${m.name}</h3>
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <div class="merchant-admin-logo-preview">
+                        ${m.logoUrl ? `<img src="${m.logoUrl}" alt="logo">` : '🏪'}
+                    </div>
+                    <h3>${m.name}</h3>
+                </div>
                 <span class="merchant-status ${m.isActive ? 'active' : 'inactive'}">${m.isActive ? 'Active' : 'Inactive'}</span>
             </div>
             <div class="merchant-admin-meta">
@@ -365,6 +370,7 @@ function editMerchant(id) {
     document.getElementById('m_name').value = merchant.name;
     document.getElementById('m_address').value = merchant.address;
     document.getElementById('m_category').value = merchant.category;
+    document.getElementById('m_logoUrl').value = merchant.logoUrl || '';
     document.getElementById('m_commission').value = merchant.commissionPercentage;
     document.getElementById('merchantModalTitle').textContent = 'Edit Merchant';
     document.getElementById('m_submitBtn').textContent = 'Update Merchant';
@@ -387,6 +393,7 @@ async function handleAddMerchant(e) {
     const name = document.getElementById('m_name').value.trim();
     const address = document.getElementById('m_address').value.trim();
     const category = document.getElementById('m_category').value;
+    const logoUrl = document.getElementById('m_logoUrl').value.trim();
     const commission = parseFloat(document.getElementById('m_commission').value) || 10;
 
     let lat = KAGISO_CENTER[0];
@@ -403,6 +410,7 @@ async function handleAddMerchant(e) {
         name,
         category,
         address,
+        logoUrl,
         latitude: lat,
         longitude: lng,
         commissionPercentage: commission,
