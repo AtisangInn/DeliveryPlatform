@@ -1,12 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Easyway Deliveries — Fresh. Fast. Local.</title>
-    <meta name="description" content="Order delicious meals from local restaurants in Kagiso. Fast delivery to your door.">
+    <meta name="description"
+        content="Order delicious meals from local restaurants in Kagiso. Fast delivery to your door.">
     <link rel="stylesheet" href="styles.css">
-    
+
     <!-- PWA / App Store-less Install Support -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#e85d2a">
@@ -15,8 +17,10 @@
     <meta name="apple-mobile-web-app-title" content="Easyway">
     <link rel="apple-touch-icon" href="assets/app_icon.png">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
 </head>
+
 <body>
 
     <!-- ============ AUTH SCREEN ============ -->
@@ -50,7 +54,8 @@
                 </div>
                 <div class="input-group">
                     <label for="authPassword">Password</label>
-                    <input type="password" id="authPassword" placeholder="••••••••" required autocomplete="current-password">
+                    <input type="password" id="authPassword" placeholder="••••••••" required
+                        autocomplete="current-password">
                 </div>
 
                 <div id="authError" class="auth-error hidden"></div>
@@ -90,7 +95,8 @@
                 <h1>What are you<br>craving today?</h1>
                 <div class="search-bar" id="merchantSearchBar">
                     <span class="search-icon">🔍</span>
-                    <input type="text" id="merchantSearch" placeholder="Search restaurants or dishes..." oninput="filterMerchants(this.value)">
+                    <input type="text" id="merchantSearch" placeholder="Search restaurants or dishes..."
+                        oninput="filterMerchants(this.value)">
                 </div>
             </div>
 
@@ -253,7 +259,9 @@
                     <label class="address-label">Delivery Address</label>
                     <div class="address-input-wrap">
                         <span class="address-pin">🏠</span>
-                        <input type="text" id="deliveryAddressInput" placeholder="Enter House # and Street (e.g. 1504 Khutsa St)" autocomplete="off">
+                        <input type="text" id="deliveryAddressInput"
+                            placeholder="Enter your House number and Street name (e.g. 1504 Khutsa St)"
+                            autocomplete="off">
                     </div>
                     <div id="addressResults" class="address-dropdown hidden">
                         <!-- Address suggestions -->
@@ -275,19 +283,21 @@
                 <h2>Set Location</h2>
                 <button class="close-btn" onclick="closeAddressModal()">✕</button>
             </div>
-            
+
             <div class="map-search-container">
                 <div class="address-input-wrap">
                     <span class="address-pin">🏠</span>
-                    <input type="text" id="modalAddressInput" placeholder="House # and Street (e.g. 1234 Molatloa St)" autocomplete="off">
+                    <input type="text" id="modalAddressInput"
+                        placeholder="Enter your House number and Street name (e.g. 1504 Khutsa St)" autocomplete="off">
                 </div>
-                <button class="btn-secondary btn-sm" id="useLiveLocationBtn" onclick="useLiveLocation()" style="margin-top: 10px; width: 100%;">
+                <button class="btn-secondary btn-sm" id="useLiveLocationBtn" onclick="useLiveLocation()"
+                    style="margin-top: 10px; width: 100%;">
                     📍 Use My Current Location
                 </button>
             </div>
 
             <div id="locationPickerMap" class="location-picker-map"></div>
-            
+
             <div class="location-confirm-bar">
                 <button id="confirmLocationBtn" class="btn-primary btn-lg" onclick="confirmMapPin()">
                     Confirm Pin Location
@@ -312,4 +322,5 @@
         }
     </script>
 </body>
+
 </html>
