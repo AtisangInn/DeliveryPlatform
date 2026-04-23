@@ -394,7 +394,8 @@ async function handleAddMerchant(e) {
     const address = document.getElementById('m_address').value.trim();
     const category = document.getElementById('m_category').value;
     const logoUrl = document.getElementById('m_logoUrl').value.trim();
-    const commission = parseFloat(document.getElementById('m_commission').value) || 10;
+    const commValue = document.getElementById('m_commission').value;
+    const commission = commValue === '' ? 10 : parseFloat(commValue);
 
     let lat = KAGISO_CENTER[0];
     let lng = KAGISO_CENTER[1];
