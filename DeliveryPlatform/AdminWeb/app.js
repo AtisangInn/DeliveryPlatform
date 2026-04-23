@@ -16,6 +16,8 @@ let state = {
     merchants: [],
     orders: [],
     drivers: [],
+    customers: [],
+    driversList: [],
     feed: [],
     mapMarkers: { merchants: {}, drivers: {}, customers: {} },
     orderFilter: 'all'
@@ -108,13 +110,18 @@ function switchPage(pageId, btn) {
 // ─── DATA LOADING ───
 async function refreshAll() {
     try {
-        const [merchants, orders] = await Promise.all([
+        const [merchants, orders, driversList, customers] = await Promise.all([
             apiGet('Merchant'),
-            apiGet('Order')
+            apiGet('Order'),
+            apiGet('Users/drivers'),
+            apiGet('Users/customers')
         ]);
         state.merchants = merchants || [];
         state.orders = orders || [];
+        state.driversList = driversList || [];
+        state.customers = customers || [];
         renderKPIs();
+        renderCustomers();
         updateMapPoints();
         logEvent('Dashboard synced');
     } catch (e) {
@@ -279,7 +286,35 @@ function renderKPIs() {
     document.getElementById('kpiRevenue').textContent = `R${revenue.toFixed(2)}`;
     document.getElementById('kpiActiveOrders').textContent = active.length;
     document.getElementById('kpiCompleted').textContent = delivered.length;
-    document.getElementById('kpiDrivers').textContent = state.merchants.length; // placeholder
+    document.getElementById('kpiDrivers').textContent = state.driversList.length;
+    document.getElementById('kpiCustomers').textContent = state.customers.length;
+}
+
+// ─── CUSTOMERS SECTION ───
+function renderCustomers() {
+    const container = document.getElementById('customersTable');
+    if (!container) return;
+
+    if (state.customers.length === 0) {
+        container.innerHTML = '<div class="feed-empty">No customers have signed up yet.</div>';
+        return;
+    }
+
+    container.innerHTML = state.customers.map(c => {
+        const joined = new Date(c.createdAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+        return `
+            <div class="table-row">
+                <div class="user-avatar-sm">👤</div>
+                <div class="table-cell" style="flex:1">
+                    <h4>${c.fullName}</h4>
+                    <p>${c.email}</p>
+                </div>
+                <div class="table-cell" style="text-align:right">
+                    <p style="color:var(--text-muted);font-size:0.78rem;">Joined ${joined}</p>
+                    <p style="font-size:0.8rem;">${c.phone || '—'}</p>
+                </div>
+            </div>`;
+    }).join('');
 }
 
 // ─── ORDERS PAGE ───
@@ -309,7 +344,7 @@ function renderOrders() {
         const statusClass = 'status-' + o.status.toLowerCase();
         const date = new Date(o.createdAt).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
         return `
-            <div class="table-row">
+            <div class="table-row orders-row">
                 <span class="table-id">#${o.id}</span>
                 <div class="table-cell">
                     <h4>${o.merchant?.name || 'Restaurant'}</h4>

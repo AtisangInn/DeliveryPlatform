@@ -107,6 +107,13 @@
                                 <span class="kpi-value" id="kpiDrivers">0</span>
                             </div>
                         </div>
+                        <div class="kpi-card">
+                            <span class="kpi-icon">👥</span>
+                            <div>
+                                <span class="kpi-label">Customers</span>
+                                <span class="kpi-value" id="kpiCustomers">0</span>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Live Map -->
@@ -128,6 +135,17 @@
                         <h2 class="section-heading">Activity Feed</h2>
                         <div id="eventFeed" class="event-feed">
                             <div class="feed-empty">No activity yet</div>
+                        </div>
+                    </div>
+
+                    <!-- Customers Section -->
+                    <div class="event-feed-wrap" style="margin-top:1.5rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+                            <h2 class="section-heading" style="margin-bottom:0;">Registered Customers</h2>
+                            <span id="kpiCustomersBadge" style="font-size:0.8rem;color:var(--text-muted);"></span>
+                        </div>
+                        <div id="customersTable" class="data-table">
+                            <div class="feed-empty">Loading...</div>
                         </div>
                     </div>
                 </section>
