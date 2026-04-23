@@ -122,6 +122,7 @@ async function refreshAll() {
         state.customers = customers || [];
         renderKPIs();
         renderCustomers();
+        renderDriversList();
         updateMapPoints();
         logEvent('Dashboard synced');
     } catch (e) {
@@ -312,6 +313,33 @@ function renderCustomers() {
                 <div class="table-cell" style="text-align:right">
                     <p style="color:var(--text-muted);font-size:0.78rem;">Joined ${joined}</p>
                     <p style="font-size:0.8rem;">${c.phone || '—'}</p>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+// ─── DRIVERS LIST (DASHBOARD) ───
+function renderDriversList() {
+    const container = document.getElementById('driversTable');
+    if (!container) return;
+
+    if (state.driversList.length === 0) {
+        container.innerHTML = '<div class="feed-empty">No drivers registered yet.</div>';
+        return;
+    }
+
+    container.innerHTML = state.driversList.map(d => {
+        const joined = new Date(d.createdAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+        return `
+            <div class="table-row">
+                <div class="user-avatar-sm">🛵</div>
+                <div class="table-cell" style="flex:1">
+                    <h4>${d.fullName}</h4>
+                    <p>${d.email}</p>
+                </div>
+                <div class="table-cell" style="text-align:right">
+                    <p style="font-size:0.8rem;font-weight:600;color:var(--accent);">${d.vehicleType || 'Motorbike'}</p>
+                    <p style="color:var(--text-muted);font-size:0.78rem;">Joined ${joined}</p>
                 </div>
             </div>`;
     }).join('');
