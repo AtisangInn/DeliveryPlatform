@@ -69,19 +69,23 @@ a { color: var(--accent); text-decoration: none; }
     height: 100%; 
     width: 100%;
     overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    background: var(--bg);
 }
-.screen.active-screen { display: block; }
+
+.screen.active-screen { 
+    display: flex;
+    flex-direction: column;
+}
 
 .auth-container {
     width: 100%;
     max-width: 420px;
     margin: 0 auto;
-    padding: 2rem 1.5rem;
+    padding: 3rem 1.5rem;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    min-height: 100vh;
+    min-height: 100%;
 }
 
 .auth-brand {
