@@ -145,6 +145,22 @@ async function connectHub() {
         loadAvailableJobs();
     });
 
+    hubConnection.on('SyncState', (message) => {
+        if (message.type === 'ActiveJob') {
+            const job = message.data;
+            state.activeJob = job;
+            localStorage.setItem('ew_active_job', JSON.stringify(job));
+            
+            // If we are not already on the active view, switch to it
+            if (!document.getElementById('viewActive').classList.contains('active-view')) {
+                switchView('active', document.querySelector('.nav-item[data-view="active"]'));
+            } else {
+                renderActiveJob();
+                initActiveMap();
+            }
+        }
+    });
+
     hubConnection.on('StatusUpdated', (data) => {
         if (state.activeJob && data.orderId === state.activeJob.orderId) {
             if (data.status === 'Delivered') {

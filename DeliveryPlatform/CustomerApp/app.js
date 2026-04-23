@@ -869,6 +869,17 @@ async function connectHub() {
         }
     });
 
+    hubConnection.on('SyncState', (message) => {
+        if (message.type === 'ActiveOrders') {
+            // Pick the first active order for tracking in this view
+            const active = message.data[0]; 
+            if (active && (!state.activeOrder || state.activeOrder.id !== active.id)) {
+                fetchOrderDetails(active.id);
+                navigateTo('tracking', document.querySelector('.nav-item[data-view="tracking"]'));
+            }
+        }
+    });
+
     hubConnection.on('DriverLocationUpdated', (data) => {
         if (state.activeOrder && data.orderId === state.activeOrder.id) {
             updateDriverMarker(data.lat, data.lng);

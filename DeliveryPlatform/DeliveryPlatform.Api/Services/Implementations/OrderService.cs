@@ -121,14 +121,22 @@ public class OrderService : IOrderService
 
     public async Task<bool> AcceptOrderAsync(int orderId, int driverId)
     {
+        // Atomic update: only update if DriverId is still null and Status is 'Paid'
+        // This is the "First-to-Claim" engine.
+        var rowsAffected = await _context.Orders
+            .Where(o => o.Id == orderId && o.DriverId == null && o.Status == "Paid")
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(o => o.DriverId, driverId)
+                .SetProperty(o => o.Status, "Assigned"));
+
+        if (rowsAffected == 0) return false;
+
+        // Fetch the updated order for broadcasting
         var order = await _context.Orders
             .Include(o => o.Merchant)
             .FirstOrDefaultAsync(o => o.Id == orderId);
-        if (order == null || order.DriverId != null || order.Status != "Paid") return false;
 
-        order.DriverId = driverId;
-        order.Status = "Assigned";
-        await _context.SaveChangesAsync();
+        if (order == null) return false;
 
         var broadcastData = new {
             OrderId = order.Id,
@@ -148,6 +156,9 @@ public class OrderService : IOrderService
         await _hubContext.Clients.Group($"User_{order.CustomerId}").SendAsync("StatusUpdated", broadcastData);
         await _hubContext.Clients.Group($"Order_{order.Id}").SendAsync("StatusUpdated", broadcastData);
         await _hubContext.Clients.Group("Admins").SendAsync("StatusUpdated", broadcastData);
+        
+        // Notify all drivers that this order is no longer available
+        await _hubContext.Clients.Group("Drivers").SendAsync("OrderClaimed", new { OrderId = orderId });
 
         return true;
     }
@@ -157,9 +168,10 @@ public class OrderService : IOrderService
         var order = await _context.Orders
             .Include(o => o.Merchant)
             .FirstOrDefaultAsync(o => o.Id == orderId);
+        
         if (order == null || order.DriverId != driverId) return false;
 
-        // Simple state validation for now
+        // Basic state validation
         var validStatuses = new[] { "Preparing", "PickedUp", "OutForDelivery", "Delivered" };
         if (!validStatuses.Contains(status)) return false;
 
