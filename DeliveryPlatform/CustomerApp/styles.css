@@ -64,8 +64,14 @@ a { color: var(--accent); text-decoration: none; }
 }
 
 /* ======= AUTH SCREEN ======= */
-.screen { display: none; height: 100%; }
-.screen.active-screen { display: flex; }
+.screen { 
+    display: none; 
+    height: 100%; 
+    width: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.screen.active-screen { display: block; }
 
 .auth-container {
     width: 100%;
