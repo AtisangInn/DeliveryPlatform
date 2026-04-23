@@ -84,30 +84,34 @@ a { color: var(--accent); text-decoration: none; }
     padding: 3rem 1.5rem;
     display: flex;
     flex-direction: column;
-    justify-content: center;
     min-height: 100%;
+}
+
+.auth-form {
+    padding-bottom: 2rem;
 }
 
 .auth-brand {
     text-align: center;
-    margin-bottom: 3rem;
+    margin-bottom: 2.5rem;
+    margin-top: auto;
 }
 
 .brand-icon {
-    width: 72px;
-    height: 72px;
+    width: 64px;
+    height: 64px;
     background: var(--accent);
-    border-radius: 20px;
+    border-radius: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2rem;
+    font-size: 1.75rem;
     margin: 0 auto 1rem;
     box-shadow: 0 8px 24px rgba(232, 93, 42, 0.3);
 }
 
 .auth-brand h1 {
-    font-size: 2rem;
+    font-size: 1.75rem;
     font-weight: 800;
     letter-spacing: -0.02em;
     color: var(--text-primary);
@@ -116,36 +120,36 @@ a { color: var(--accent); text-decoration: none; }
 .auth-brand p {
     color: var(--text-secondary);
     margin-top: 0.25rem;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
 }
 
 .auth-form h2 {
-    font-size: 1.5rem;
+    font-size: 1.4rem;
     font-weight: 700;
     margin-bottom: 0.25rem;
 }
 
 .auth-subtitle {
     color: var(--text-secondary);
-    font-size: 0.9rem;
-    margin-bottom: 1.5rem;
+    font-size: 0.85rem;
+    margin-bottom: 1.25rem;
 }
 
 .input-group {
-    margin-bottom: 1rem;
+    margin-bottom: 0.85rem;
 }
 
 .input-group label {
     display: block;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-weight: 600;
     color: var(--text-secondary);
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.35rem;
 }
 
 .input-group input, .address-input-wrap input {
     width: 100%;
-    padding: 0.9rem 1rem;
+    padding: 0.85rem 1rem;
     background: var(--surface);
     border: 1.5px solid transparent;
     border-radius: var(--radius-md);
@@ -172,7 +176,7 @@ a { color: var(--accent); text-decoration: none; }
 }
 
 .register-fields.show {
-    max-height: 200px;
+    max-height: 250px;
     opacity: 1;
 }
 
@@ -188,7 +192,9 @@ a { color: var(--accent); text-decoration: none; }
 .auth-toggle {
     text-align: center;
     margin-top: 1.5rem;
-    font-size: 0.9rem;
+    margin-bottom: auto;
+    padding-bottom: 2rem;
+    font-size: 0.85rem;
     color: var(--text-secondary);
 }
 
