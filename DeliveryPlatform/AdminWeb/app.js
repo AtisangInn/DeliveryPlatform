@@ -264,7 +264,7 @@ function updateDriverMapMarker(data) {
         state.mapMarkers.drivers[orderId] = L.marker([lat, lng], {
             icon: L.divIcon({
                 className: 'map-pin',
-                html: '<div style="background:#1a1a1a;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4)">🛵</div>',
+                html: '<div style="background:#1a1a1a;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4)"><img src="assets/logo.png" style="width:16px;height:16px;object-fit:contain;"></div>',
                 iconSize: [30, 30], iconAnchor: [15, 15]
             })
         }).addTo(adminMap).bindPopup(`Driver (Order #${orderId})`);
@@ -332,7 +332,7 @@ function renderDriversList() {
         const joined = new Date(d.createdAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
         return `
             <div class="table-row">
-                <div class="user-avatar-sm">🛵</div>
+                <img src="assets/logo.png" class="user-avatar-sm" style="object-fit:contain;background:#fff;padding:2px;">
                 <div class="table-cell" style="flex:1">
                     <h4>${d.fullName}</h4>
                     <p>${d.email}</p>
@@ -713,7 +713,7 @@ function renderDrivers() {
     grid.innerHTML = drivers.map(d => `
         <div class="driver-admin-card">
             <div class="driver-admin-top">
-                <div class="driver-admin-avatar">🛵</div>
+                <img src="assets/logo.png" class="driver-admin-avatar" style="object-fit:contain;background:#fff;padding:4px;border-radius:50%;width:40px;height:40px;box-shadow:var(--shadow-sm);">
                 <div class="driver-admin-name">
                     <h3>${d.fullName || 'Driver'}</h3>
                     <span>${d.email || ''}</span>

@@ -334,9 +334,10 @@ function initActiveMap() {
     if (!driverMarker) {
         driverMarker = L.marker(KAGISO_CENTER, {
             icon: L.divIcon({
-                className: 'custom-pin',
-                html: '<div style="background:#1a1a1a;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;border:3px solid white;box-shadow:0 2px 12px rgba(0,0,0,0.5)">🛵</div>',
-                iconSize: [36, 36], iconAnchor: [18, 18]
+                className: 'custom-div-icon',
+                html: '<div style="background:#1a1a1a;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;border:3px solid white;box-shadow:0 2px 12px rgba(0,0,0,0.5)"><img src="assets/logo.png" style="width:20px;height:20px;object-fit:contain;"></div>',
+                iconSize: [36, 36],
+                iconAnchor: [18, 18]
             })
         }).addTo(driverMap);
     }

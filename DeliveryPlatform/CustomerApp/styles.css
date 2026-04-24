@@ -1459,3 +1459,18 @@ a { color: var(--accent); text-decoration: none; }
     0% { opacity: 0; }
     100% { opacity: 1; }
 }
+
+.splash-logo-img {
+    width: 140px;
+    height: auto;
+    margin-bottom: 1rem;
+    filter: drop-shadow(0 4px 16px rgba(255, 95, 0, 0.3));
+    border-radius: 20px;
+}
+.splash-subtitle {
+    font-size: 0.85rem;
+    color: #FF5F00;
+    letter-spacing: 3px;
+    margin-top: 0.5rem;
+    text-transform: uppercase;
+}
