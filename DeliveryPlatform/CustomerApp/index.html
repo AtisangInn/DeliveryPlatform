@@ -290,16 +290,13 @@
                 <!-- Delivery Address -->
                 <div class="address-section">
                     <label class="address-label">Delivery Address</label>
-                    <div class="address-input-wrap">
+                    <div class="address-input-wrap" onclick="openAddressModal()" style="cursor: pointer;">
                         <span class="address-pin">🏠</span>
-                        <input type="text" id="deliveryAddressInput"
-                            placeholder="Enter your House number and Street name (e.g. 1504 Khutsa St)"
-                            autocomplete="off">
+                        <div id="checkoutDeliveryAddress" style="padding: 12px; flex: 1; font-size: 14px; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            Select your delivery address...
+                        </div>
+                        <span style="padding-right: 12px; color: var(--accent);">Change</span>
                     </div>
-                    <div id="addressResults" class="address-dropdown hidden">
-                        <!-- Address suggestions -->
-                    </div>
-                    <p id="selectedAddress" class="selected-address hidden"></p>
                 </div>
 
                 <button id="checkoutBtn" class="btn-primary btn-lg checkout-btn" onclick="processCheckout()">

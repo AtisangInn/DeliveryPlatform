@@ -554,9 +554,9 @@ function renderCartSheet() {
     document.getElementById('cartTotal').textContent = `R${(subtotal + DELIVERY_FEE).toFixed(2)}`;
 
     // Populate address if saved
-    const addrInput = document.getElementById('deliveryAddressInput');
-    if (state.deliveryAddress && !addrInput.value) {
-        addrInput.value = state.deliveryAddress;
+    const checkoutAddr = document.getElementById('checkoutDeliveryAddress');
+    if (state.deliveryAddress && checkoutAddr) {
+        checkoutAddr.textContent = state.deliveryAddress;
     }
 }
 
@@ -605,14 +605,12 @@ function selectAddress(display, lat, lng) {
     localStorage.setItem('ew_lat', lat);
     localStorage.setItem('ew_lng', lng);
 
-    document.getElementById('deliveryAddressInput').value = display;
-    document.getElementById('headerAddress').textContent = display.split(',')[0];
-
-    const selected = document.getElementById('selectedAddress');
-    if (selected) {
-        selected.textContent = '✓ Address confirmed';
-        selected.classList.remove('hidden');
+    const checkoutAddr = document.getElementById('checkoutDeliveryAddress');
+    if (checkoutAddr) {
+        checkoutAddr.textContent = display;
     }
+    
+    document.getElementById('headerAddress').textContent = display.split(',')[0];
 }
 
 // Address modal
