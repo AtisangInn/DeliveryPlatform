@@ -146,7 +146,8 @@ public static class DbInitializer
                 Latitude = -26.1650,
                 Longitude = 27.7850,
                 IsActive = true,
-                CommissionPercentage = 10.00m
+                CommissionPercentage = 10.00m,
+                LogoUrl = "assets/kd_delight_logo.png"
             };
             context.Merchants.Add(kdDelight);
             await context.SaveChangesAsync();

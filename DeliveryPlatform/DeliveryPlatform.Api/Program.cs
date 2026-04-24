@@ -105,6 +105,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 // app.UseHttpsRedirection();
+app.UseStaticFiles(); // Enable serving static files like uploads
 app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();

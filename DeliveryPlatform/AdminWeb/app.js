@@ -434,6 +434,11 @@ function editMerchant(id) {
     document.getElementById('m_address').value = merchant.address;
     document.getElementById('m_category').value = merchant.category;
     document.getElementById('m_logoUrl').value = merchant.logoUrl || '';
+    if (merchant.logoUrl) {
+        setLogoPreview(merchant.logoUrl);
+    } else {
+        removeLogoPreview();
+    }
     document.getElementById('m_commission').value = merchant.commissionPercentage;
     document.getElementById('merchantModalTitle').textContent = 'Edit Merchant';
     document.getElementById('m_submitBtn').textContent = 'Update Merchant';
@@ -516,6 +521,7 @@ function resetMerchantForm() {
     document.getElementById('m_id').value = '';
     document.getElementById('merchantModalTitle').textContent = 'Add Merchant';
     document.getElementById('m_submitBtn').textContent = 'Add Merchant';
+    if(typeof removeLogoPreview === 'function') removeLogoPreview();
 }
 
 async function toggleMerchant(id, newStatus) {
@@ -798,6 +804,102 @@ function logout() {
     localStorage.removeItem('ew_admin_name');
     if (hubConnection) hubConnection.stop();
     location.reload();
+}
+
+// ─── FILE UPLOAD & DRAG & DROP ───
+const dropZone = document.getElementById('m_logoDropZone');
+const fileInput = document.getElementById('m_logoFileInput');
+
+if (dropZone && fileInput) {
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+
+    ['dragleave', 'dragend'].forEach(type => {
+        dropZone.addEventListener(type, () => {
+            dropZone.classList.remove('dragover');
+        });
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) {
+            fileInput.files = e.dataTransfer.files;
+            handleFileUpload(e.dataTransfer.files[0]);
+        }
+    });
+
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length) {
+            handleFileUpload(fileInput.files[0]);
+        }
+    });
+}
+
+async function handleFileUpload(file) {
+    if (!file.type.startsWith('image/')) {
+        showToast('Please upload an image file');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const promptText = dropZone.querySelector('.drop-zone-prompt');
+    const originalText = promptText.textContent;
+    promptText.textContent = 'Uploading...';
+
+    try {
+        const res = await fetch(`${API_URL}/Upload`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${state.authToken}`
+            },
+            body: formData
+        });
+
+        if (!res.ok) throw new Error('Upload failed');
+        
+        const data = await res.json();
+        const url = data.url; // Use absolute URL or relativeUrl
+
+        document.getElementById('m_logoUrl').value = url;
+        setLogoPreview(url);
+        showToast('Logo uploaded successfully');
+    } catch (e) {
+        console.error(e);
+        showToast('Error uploading logo');
+    } finally {
+        promptText.textContent = originalText;
+    }
+}
+
+function setLogoPreview(url) {
+    const previewContainer = document.getElementById('m_logoPreviewContainer');
+    const previewImg = document.getElementById('m_logoPreview');
+    const promptText = document.querySelector('.drop-zone-prompt');
+    
+    previewImg.src = url;
+    previewContainer.classList.remove('hidden');
+    promptText.style.display = 'none';
+}
+
+window.removeLogoPreview = function(e) {
+    if (e) e.stopPropagation(); // prevent clicking the dropzone
+    const previewContainer = document.getElementById('m_logoPreviewContainer');
+    const previewImg = document.getElementById('m_logoPreview');
+    const promptText = document.querySelector('.drop-zone-prompt');
+    
+    previewImg.src = '';
+    previewContainer.classList.add('hidden');
+    promptText.style.display = 'block';
+    
+    document.getElementById('m_logoUrl').value = '';
+    document.getElementById('m_logoFileInput').value = '';
 }
 
 // ─── BOOT ───
