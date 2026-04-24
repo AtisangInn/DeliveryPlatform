@@ -86,22 +86,36 @@ window.addEventListener('appinstalled', (evt) => {
 
 // ─── INIT ───
 function init() {
-    if (state.authToken) {
-        showApp();
-    } else {
-        showAuth();
-    }
-    setupAuthListeners();
+    const splash = document.getElementById('splashScreen');
+    
+    // Hide everything else initially
+    document.getElementById('authScreen').classList.remove('active-screen');
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('appShell').classList.add('hidden');
+    
+    setTimeout(() => {
+        splash.classList.add('fade-out');
+        
+        setTimeout(() => {
+            splash.classList.add('hidden');
+            if (state.authToken) {
+                showApp();
+            } else {
+                showAuth();
+            }
+            setupAuthListeners();
 
-    // Check for payment redirect params
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('status') === 'success') {
-        showToast('Payment successful!');
-        window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (params.get('status') === 'cancel') {
-        showToast('Payment cancelled');
-        window.history.replaceState({}, document.title, window.location.pathname);
-    }
+            // Check for payment redirect params
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('status') === 'success') {
+                showToast('Payment successful!');
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } else if (params.get('status') === 'cancel') {
+                showToast('Payment cancelled');
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }, 500); // Wait for fade out transition
+    }, 2500);
 }
 
 function showAuth() {
