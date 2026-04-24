@@ -373,10 +373,13 @@ function filterByCategory(cat, btn) {
             empty.classList.add('hidden');
             grid.innerHTML = filtered.map(m => {
                 const emoji = getCategoryEmoji(m.category);
+                const imageHtml = m.logoUrl 
+                    ? `<img src="${m.logoUrl}" alt="${m.name}" class="merchant-logo-img">`
+                    : emoji;
                 return `
                     <div class="merchant-card" onclick="openMerchant(${m.id})">
                         <div class="merchant-card-img">
-                            ${emoji}
+                            ${imageHtml}
                             <span class="merchant-tag">${m.category}</span>
                         </div>
                         <div class="merchant-card-body">
