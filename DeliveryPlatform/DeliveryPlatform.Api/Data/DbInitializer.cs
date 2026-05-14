@@ -186,26 +186,26 @@ public static class DbInitializer
             await context.SaveChangesAsync();
         }
 
-        // ─── 6. SEED MERCHANT: Sparkle Car Wash (only if missing) ─────────────
-        if (!await context.Merchants.AnyAsync(m => m.Name == "Sparkle Car Wash"))
+        // ─── 6. SEED MERCHANT: Tidal Fresh (only if missing) ─────────────
+        if (!await context.Merchants.AnyAsync(m => m.Name == "Tidal Fresh"))
         {
-            var sparkle = new Merchant
+            var tidalFresh = new Merchant
             {
-                Name = "Sparkle Car Wash",
+                Name = "Tidal Fresh",
                 Category = "Car Wash",
                 Address = "12 Kagiso Ave",
                 Latitude = -26.1510,
                 Longitude = 27.7810,
                 IsActive = true,
-                CommissionPercentage = 10.00m
+                CommissionPercentage = 10.00m,
+                LogoUrl = "assets/tidal_fresh_logo.png"
             };
-            context.Merchants.Add(sparkle);
+            context.Merchants.Add(tidalFresh);
             await context.SaveChangesAsync();
 
             context.MenuItems.AddRange(
-                new MenuItem { MerchantId = sparkle.Id, Name = "Basic Wash & Dry", Price = 80.00m, Description = "Exterior wash and dry", Category = "Washes", IsAvailable = true },
-                new MenuItem { MerchantId = sparkle.Id, Name = "Full House Valet", Price = 250.00m, Description = "Full interior and exterior detailing", Category = "Washes", IsAvailable = true },
-                new MenuItem { MerchantId = sparkle.Id, Name = "Air Freshener", Price = 35.00m, Description = "Pine or New Car scent", Category = "Accessories", IsAvailable = true }
+                new MenuItem { MerchantId = tidalFresh.Id, Name = "Essential Package", Price = 270.00m, Description = "1 x Wash and Wax, 1 x Tyre Gel, 1 x Car Polish, 1 x Mag Wheel Cleaner, 2 x Micro Fibre Cloths", Category = "Car Care Packages", IsAvailable = true },
+                new MenuItem { MerchantId = tidalFresh.Id, Name = "Full Package", Price = 450.00m, Description = "1 x High Foam Shampoo, 1 x Wash and Wax, 1 x Tyre Gel, 1 x Car Polish, 1 x Mag Wheel Cleaner, 1 x Upholstery Cleaner, 1 x Engine Cleaner, 2 x Micro Fibre Cloths", Category = "Car Care Packages", IsAvailable = true }
             );
             await context.SaveChangesAsync();
         }
