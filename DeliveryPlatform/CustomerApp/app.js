@@ -238,6 +238,18 @@ async function handleAuth(e) {
     }
 }
 
+function togglePasswordVisibility() {
+    const pwd = document.getElementById('authPassword');
+    const icon = document.getElementById('pwdToggleIcon');
+    if (pwd.type === 'password') {
+        pwd.type = 'text';
+        icon.textContent = '👁️‍🗨️'; // Change to eye open icon or similar
+    } else {
+        pwd.type = 'password';
+        icon.textContent = '👁️'; // Change to eye closed
+    }
+}
+
 // ─── NAVIGATION ───
 function navigateTo(viewId, btn) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active-view'));
@@ -331,24 +343,39 @@ function renderMerchants(filter = '') {
     empty.classList.add('hidden');
     grid.innerHTML = filtered.map(m => {
         const itemCount = (m.menuItems || []).length;
-        const emoji = getCategoryEmoji(m.category);
-        const imageHtml = m.logoUrl 
-            ? `<img src="${m.logoUrl}" alt="${m.name}" class="merchant-logo-img">`
-            : emoji;
+        
+        let imageHtml = '';
+        if (m.logoUrl) {
+            imageHtml = `<img src="${m.logoUrl}" alt="${m.name}" class="merchant-logo-img">`;
+        } else {
+            const initials = m.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            imageHtml = `<div class="dynamic-logo-gradient">${initials}</div>`;
+        }
+
+        // Top 2 products preview
+        const topProducts = (m.menuItems || []).slice(0, 2);
+        const productsHtml = topProducts.length > 0 
+            ? `<div class="top-products-preview">
+                 ${topProducts.map(p => `<span class="product-pill">${p.name}</span>`).join('')}
+               </div>`
+            : '';
             
+        const isOnline = m.isActive ? '<span class="status-badge online"></span>' : '';
+
         return `
             <div class="merchant-card" onclick="openMerchant(${m.id})">
                 <div class="merchant-card-img">
                     ${imageHtml}
-                    <span class="merchant-tag">${m.category}</span>
+                    <span class="merchant-tag">${getCategoryEmoji(m.category)} ${m.category}</span>
                 </div>
                 <div class="merchant-card-body">
-                    <h3>${m.name}</h3>
+                    <h3>${m.name} ${isOnline}</h3>
                     <div class="merchant-card-meta">
                         <span>${itemCount} items</span>
                         <span class="meta-dot"></span>
                         <span>R${DELIVERY_FEE.toFixed(0)} delivery</span>
                     </div>
+                    ${productsHtml}
                 </div>
             </div>
         `;
@@ -358,9 +385,11 @@ function renderMerchants(filter = '') {
 function getCategoryEmoji(cat) {
     const map = {
         'Fast Food': '🍔', 'Pizza': '🍕', 'African Cuisine': '🍲',
-        'Drinks': '🥤', 'Desserts': '🍰', 'Coffee': '☕'
+        'Drinks': '🥤', 'Desserts': '🍰', 'Coffee': '☕',
+        'Car Wash': '🚗', 'Medication': '💊', 'Beverages': '🍾',
+        'Accessories': '🛍️'
     };
-    return map[cat] || '🍽️';
+    return map[cat] || '🏪';
 }
 
 function renderCategories() {
@@ -386,23 +415,37 @@ function filterByCategory(cat, btn) {
         } else {
             empty.classList.add('hidden');
             grid.innerHTML = filtered.map(m => {
-                const emoji = getCategoryEmoji(m.category);
-                const imageHtml = m.logoUrl 
-                    ? `<img src="${m.logoUrl}" alt="${m.name}" class="merchant-logo-img">`
-                    : emoji;
+                let imageHtml = '';
+                if (m.logoUrl) {
+                    imageHtml = `<img src="${m.logoUrl}" alt="${m.name}" class="merchant-logo-img">`;
+                } else {
+                    const initials = m.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                    imageHtml = `<div class="dynamic-logo-gradient">${initials}</div>`;
+                }
+
+                const topProducts = (m.menuItems || []).slice(0, 2);
+                const productsHtml = topProducts.length > 0 
+                    ? `<div class="top-products-preview">
+                         ${topProducts.map(p => `<span class="product-pill">${p.name}</span>`).join('')}
+                       </div>`
+                    : '';
+                    
+                const isOnline = m.isActive ? '<span class="status-badge online"></span>' : '';
+
                 return `
                     <div class="merchant-card" onclick="openMerchant(${m.id})">
                         <div class="merchant-card-img">
                             ${imageHtml}
-                            <span class="merchant-tag">${m.category}</span>
+                            <span class="merchant-tag">${getCategoryEmoji(m.category)} ${m.category}</span>
                         </div>
                         <div class="merchant-card-body">
-                            <h3>${m.name}</h3>
+                            <h3>${m.name} ${isOnline}</h3>
                             <div class="merchant-card-meta">
                                 <span>${(m.menuItems||[]).length} items</span>
                                 <span class="meta-dot"></span>
                                 <span>R${DELIVERY_FEE.toFixed(0)} delivery</span>
                             </div>
+                            ${productsHtml}
                         </div>
                     </div>
                 `;
@@ -450,7 +493,11 @@ function openMerchant(id) {
 
         container.innerHTML = Object.entries(groups).map(([cat, catItems]) => `
             <h3 class="menu-category-title">${cat}</h3>
-            ${catItems.filter(i => i.isAvailable).map(item => `
+            ${catItems.filter(i => i.isAvailable).map(item => {
+                const imgHtml = item.imageUrl 
+                    ? `<img src="${item.imageUrl}" alt="${item.name}">` 
+                    : `<div class="menu-item-fallback">${getCategoryEmoji(item.category || m.category)}</div>`;
+                return `
                 <div class="menu-item">
                     <div class="menu-item-info">
                         <h4>${item.name}</h4>
@@ -459,12 +506,14 @@ function openMerchant(id) {
                     </div>
                     <div class="menu-item-right">
                         <div class="menu-item-image">
-                            ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.name}">` : '🍔'}
+                            ${imgHtml}
                         </div>
-                        <button class="add-item-btn" onclick="addToCart(${item.id}, '${item.name.replace(/'/g, "\\'")}', ${item.price})">+</button>
+                        <button class="add-item-btn" onclick="addToCart(${item.id}, '${item.name.replace(/'/g, "\\'")}', ${item.price})">
+                            <span class="add-icon">+</span>
+                        </button>
                     </div>
                 </div>
-            `).join('')}
+            `}).join('')}
         `).join('');
     }
 

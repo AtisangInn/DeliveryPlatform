@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Easyway Deliveries — Fresh. Fast. Local.</title>
     <meta name="description"
-        content="Order delicious meals from local restaurants in Kagiso. Fast delivery to your door.">
+        content="Order from local businesses in Kagiso. Fast delivery to your door.">
     <link rel="stylesheet" href="styles.css">
 
     <!-- PWA / App Store-less Install Support -->
@@ -64,8 +64,13 @@
                 </div>
                 <div class="input-group">
                     <label for="authPassword">Password</label>
-                    <input type="password" id="authPassword" placeholder="••••••••" required
-                        autocomplete="current-password">
+                    <div class="password-input-wrapper">
+                        <input type="password" id="authPassword" placeholder="••••••••" required
+                            autocomplete="current-password">
+                        <button type="button" class="pwd-toggle-btn" onclick="togglePasswordVisibility()" aria-label="Toggle password visibility">
+                            <span id="pwdToggleIcon">👁️</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div id="authError" class="auth-error hidden"></div>
@@ -76,6 +81,21 @@
                     <span id="toggleLabel">Don't have an account?</span>
                     <a href="#" id="toggleAuth">Create Account</a>
                 </p>
+
+                <!-- Social Login Buttons -->
+                <div class="social-login-container">
+                    <div class="social-divider">
+                        <span>or</span>
+                    </div>
+                    <button type="button" class="btn-social btn-google" onclick="showToast('Google login coming soon')">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google Logo" class="social-icon">
+                        Continue with Google
+                    </button>
+                    <button type="button" class="btn-social btn-apple" onclick="showToast('Apple login coming soon')">
+                        <span class="social-icon apple-icon"></span>
+                        Continue with Apple
+                    </button>
+                </div>
             </form>
         </div>
     </div>
@@ -105,7 +125,7 @@
                 <h1>What are you<br>craving today?</h1>
                 <div class="search-bar" id="merchantSearchBar">
                     <span class="search-icon">🔍</span>
-                    <input type="text" id="merchantSearch" placeholder="Search restaurants or dishes..."
+                    <input type="text" id="merchantSearch" placeholder="Search businesses or products..."
                         oninput="filterMerchants(this.value)">
                 </div>
             </div>
@@ -115,7 +135,7 @@
             </div>
 
             <div class="section-label">
-                <h2>Restaurants near you</h2>
+                <h2>Local Businesses near you</h2>
             </div>
 
             <div id="merchantGrid" class="merchant-grid">
@@ -123,8 +143,8 @@
             </div>
 
             <div id="emptyMerchants" class="empty-state hidden">
-                <span class="empty-icon">🍽️</span>
-                <h3>No restaurants available</h3>
+                <span class="empty-icon">🏪</span>
+                <h3>No businesses available</h3>
                 <p>Check back soon — we're growing!</p>
             </div>
         </section>
@@ -300,12 +320,12 @@
                 <!-- Delivery Address -->
                 <div class="address-section">
                     <label class="address-label">Delivery Address</label>
-                    <div class="address-input-wrap" onclick="openAddressModal()" style="cursor: pointer;">
-                        <span class="address-pin">🏠</span>
-                        <div id="checkoutDeliveryAddress" style="padding: 12px; flex: 1; font-size: 14px; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            Select your delivery address...
+                    <div class="address-input-wrap checkout-address-wrap" onclick="openAddressModal()" style="cursor: pointer;">
+                        <div class="map-thumbnail"></div>
+                        <div class="checkout-address-text">
+                            <div id="checkoutDeliveryAddress">Select your delivery address...</div>
+                            <span class="change-text">Change</span>
                         </div>
-                        <span style="padding-right: 12px; color: var(--accent);">Change</span>
                     </div>
                 </div>
 

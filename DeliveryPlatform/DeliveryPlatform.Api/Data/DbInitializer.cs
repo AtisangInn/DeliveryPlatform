@@ -185,5 +185,77 @@ public static class DbInitializer
             );
             await context.SaveChangesAsync();
         }
+
+        // ─── 6. SEED MERCHANT: Sparkle Car Wash (only if missing) ─────────────
+        if (!await context.Merchants.AnyAsync(m => m.Name == "Sparkle Car Wash"))
+        {
+            var sparkle = new Merchant
+            {
+                Name = "Sparkle Car Wash",
+                Category = "Car Wash",
+                Address = "12 Kagiso Ave",
+                Latitude = -26.1510,
+                Longitude = 27.7810,
+                IsActive = true,
+                CommissionPercentage = 10.00m
+            };
+            context.Merchants.Add(sparkle);
+            await context.SaveChangesAsync();
+
+            context.MenuItems.AddRange(
+                new MenuItem { MerchantId = sparkle.Id, Name = "Basic Wash & Dry", Price = 80.00m, Description = "Exterior wash and dry", Category = "Washes", IsAvailable = true },
+                new MenuItem { MerchantId = sparkle.Id, Name = "Full House Valet", Price = 250.00m, Description = "Full interior and exterior detailing", Category = "Washes", IsAvailable = true },
+                new MenuItem { MerchantId = sparkle.Id, Name = "Air Freshener", Price = 35.00m, Description = "Pine or New Car scent", Category = "Accessories", IsAvailable = true }
+            );
+            await context.SaveChangesAsync();
+        }
+
+        // ─── 7. SEED MERCHANT: Kagiso Pharmacy (only if missing) ─────────────
+        if (!await context.Merchants.AnyAsync(m => m.Name == "Kagiso Pharmacy"))
+        {
+            var pharmacy = new Merchant
+            {
+                Name = "Kagiso Pharmacy",
+                Category = "Medication",
+                Address = "Shop 4, Kagiso Mall",
+                Latitude = -26.1590,
+                Longitude = 27.7700,
+                IsActive = true,
+                CommissionPercentage = 10.00m
+            };
+            context.Merchants.Add(pharmacy);
+            await context.SaveChangesAsync();
+
+            context.MenuItems.AddRange(
+                new MenuItem { MerchantId = pharmacy.Id, Name = "Paracetamol 500mg", Price = 25.00m, Description = "Pain relief (20 tablets)", Category = "Over the Counter", IsAvailable = true },
+                new MenuItem { MerchantId = pharmacy.Id, Name = "Vitamin C 1000mg", Price = 65.00m, Description = "Immune booster", Category = "Vitamins", IsAvailable = true },
+                new MenuItem { MerchantId = pharmacy.Id, Name = "Cough Syrup", Price = 45.00m, Description = "Relieves dry coughs", Category = "Over the Counter", IsAvailable = true }
+            );
+            await context.SaveChangesAsync();
+        }
+
+        // ─── 8. SEED MERCHANT: Thirsty Liquors (only if missing) ─────────────
+        if (!await context.Merchants.AnyAsync(m => m.Name == "Thirsty Liquors"))
+        {
+            var liquor = new Merchant
+            {
+                Name = "Thirsty Liquors",
+                Category = "Beverages",
+                Address = "88 Main Rd",
+                Latitude = -26.1620,
+                Longitude = 27.7800,
+                IsActive = true,
+                CommissionPercentage = 10.00m
+            };
+            context.Merchants.Add(liquor);
+            await context.SaveChangesAsync();
+
+            context.MenuItems.AddRange(
+                new MenuItem { MerchantId = liquor.Id, Name = "Castle Lite 6-pack", Price = 95.00m, Description = "6 x 340ml bottles", Category = "Beer", IsAvailable = true },
+                new MenuItem { MerchantId = liquor.Id, Name = "Savanna Dry 6-pack", Price = 110.00m, Description = "6 x 330ml bottles", Category = "Cider", IsAvailable = true },
+                new MenuItem { MerchantId = liquor.Id, Name = "Coca-Cola 2L", Price = 25.00m, Description = "Soft drink", Category = "Mixers", IsAvailable = true }
+            );
+            await context.SaveChangesAsync();
+        }
     }
 }
